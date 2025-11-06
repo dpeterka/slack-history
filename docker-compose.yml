@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  history-slackbot:
+    build: .
+    container_name: history-slackbot
+    env_file:
+      - .env
+    restart: unless-stopped
+    environment:
+      - TZ=America/New_York
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
