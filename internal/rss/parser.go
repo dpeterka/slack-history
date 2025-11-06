@@ -44,6 +44,13 @@ type HistoricalEvent struct {
 	RawItem     Item
 }
 
+// Holiday represents a fun holiday
+type Holiday struct {
+	Title       string
+	Description string
+	Link        string
+}
+
 // Parser handles RSS feed parsing
 type Parser struct {
 	client *http.Client
@@ -193,4 +200,67 @@ func (p *Parser) FetchMultipleFeeds(urls []string) ([]HistoricalEvent, error) {
 	}
 
 	return allEvents, nil
+}
+
+// FetchHolidays fetches holidays from a holiday RSS feed
+func (p *Parser) FetchHolidays(url string) ([]Holiday, error) {
+	// Create request with browser headers
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Add Chrome browser headers
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "application/xml,text/xml,application/rss+xml,text/html;q=0.9,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
+	req.Header.Set("Connection", "keep-alive")
+	req.Header.Set("Cache-Control", "max-age=0")
+
+	// Fetch the RSS feed
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch RSS feed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	// Handle gzip-compressed response
+	var reader io.Reader = resp.Body
+	if resp.Header.Get("Content-Encoding") == "gzip" {
+		gzipReader, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+		}
+		defer gzipReader.Close()
+		reader = gzipReader
+	}
+
+	// Read the response body
+	body, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// Parse the XML
+	var feed Feed
+	if err := xml.Unmarshal(body, &feed); err != nil {
+		return nil, fmt.Errorf("failed to parse XML: %w", err)
+	}
+
+	// Convert items to holidays
+	holidays := make([]Holiday, 0, len(feed.Channel.Items))
+	for _, item := range feed.Channel.Items {
+		holiday := Holiday{
+			Title:       item.Title,
+			Description: cleanHTML(item.Description),
+			Link:        item.Link,
+		}
+		holidays = append(holidays, holiday)
+	}
+
+	return holidays, nil
 }

@@ -19,12 +19,16 @@ type Config struct {
 	// RSS feed URLs
 	RSSFeedURLs []string
 
+	// Holiday feed URL
+	HolidayFeedURL string
+
 	// Scheduler configuration
 	ScheduleCron string // Cron expression for scheduling
 	RunOnce      bool   // Run once and exit (for testing)
 
 	// LLM prompt configuration
 	MaxEvents         int // Maximum number of events to select
+	MaxHolidays       int // Maximum number of holidays to display
 	EventSelectionPrompt string
 }
 
@@ -36,12 +40,16 @@ func Load() (*Config, error) {
 		ClaudeModel:     getEnvOrDefault("CLAUDE_MODEL", "claude-sonnet-4-5"),
 		ScheduleCron:    getEnvOrDefault("SCHEDULE_CRON", "0 9 * * *"), // Default: 9 AM daily
 		RunOnce:         getEnvBool("RUN_ONCE", false),
-		MaxEvents:       getEnvInt("MAX_EVENTS", 2),
+		MaxEvents:       getEnvInt("MAX_EVENTS", 1),
+		MaxHolidays:     getEnvInt("MAX_HOLIDAYS", 2),
 	}
 
 	// RSS feed URLs - support multiple feeds
 	feedURL := getEnvOrDefault("RSS_FEED_URL", "https://www.onthisday.com/rss/today-in-history.xml")
 	cfg.RSSFeedURLs = []string{feedURL}
+
+	// Holiday feed URL
+	cfg.HolidayFeedURL = getEnvOrDefault("HOLIDAY_FEED_URL", "https://api.checkiday.com/rss?tz=America/New_York")
 
 	// Default event selection prompt
 	cfg.EventSelectionPrompt = getEnvOrDefault("EVENT_SELECTION_PROMPT",

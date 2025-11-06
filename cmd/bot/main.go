@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/dpeterka/history-slackbot/internal/config"
@@ -83,6 +84,45 @@ func main() {
 	log.Println("History Slackbot stopped")
 }
 
+// filterFunHolidays filters out serious/political holidays and keeps only fun ones
+func filterFunHolidays(holidays []rss.Holiday) []rss.Holiday {
+	// Keywords that indicate serious/political/religious holidays to skip
+	seriousKeywords := []string{
+		"International", "World", "National Awareness", "Day for",
+		"Memorial", "Remembrance", "Victims", "Prevention",
+		"Human Rights", "Peace", "Conflict", "War", "Violence",
+		"Exploitation", "Poverty", "Hunger", "Disease",
+		"Awareness Week", "Awareness Month", "Solidarity",
+		"Against", "United Nations", "Commemoration",
+	}
+
+	var funHolidays []rss.Holiday
+	for _, holiday := range holidays {
+		isFun := true
+		title := holiday.Title
+
+		// Check if title contains any serious keywords
+		for _, keyword := range seriousKeywords {
+			if contains(title, keyword) {
+				isFun = false
+				break
+			}
+		}
+
+		if isFun {
+			funHolidays = append(funHolidays, holiday)
+		}
+	}
+
+	return funHolidays
+}
+
+// contains checks if a string contains a substring (case-insensitive)
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr ||
+		strings.Contains(strings.ToLower(s), strings.ToLower(substr)))
+}
+
 // createJob creates the main job function
 func createJob(cfg *config.Config) scheduler.Job {
 	return func(ctx context.Context) error {
@@ -108,10 +148,35 @@ func createJob(cfg *config.Config) scheduler.Job {
 		}
 		log.Printf("Selected %d events", len(selectedEvents))
 
+		// Fetch holidays
+		var holidays []string
+		if cfg.HolidayFeedURL != "" {
+			log.Println("Fetching fun holidays...")
+			holidayData, err := parser.FetchHolidays(cfg.HolidayFeedURL)
+			if err != nil {
+				log.Printf("Warning: failed to fetch holidays: %v", err)
+			} else {
+				log.Printf("Fetched %d holidays", len(holidayData))
+				// Filter for fun holidays (skip serious/political ones)
+				funHolidays := filterFunHolidays(holidayData)
+				log.Printf("Filtered to %d fun holidays", len(funHolidays))
+
+				// Limit to MaxHolidays
+				maxCount := cfg.MaxHolidays
+				if maxCount > len(funHolidays) {
+					maxCount = len(funHolidays)
+				}
+				for i := 0; i < maxCount; i++ {
+					holidays = append(holidays, funHolidays[i].Title)
+				}
+				log.Printf("Selected %d holidays to display", len(holidays))
+			}
+		}
+
 		// Post to Slack
 		log.Println("Posting to Slack...")
 		poster := slack.NewPoster(cfg.SlackWebhookURL)
-		if err := poster.PostEvents(selectedEvents); err != nil {
+		if err := poster.PostEventsWithHolidays(selectedEvents, holidays); err != nil {
 			return err
 		}
 

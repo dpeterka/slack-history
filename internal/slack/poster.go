@@ -56,11 +56,16 @@ type Attachment struct {
 
 // PostEvents posts selected events to Slack
 func (p *Poster) PostEvents(events []llm.SelectedEvent) error {
-	if len(events) == 0 {
-		return fmt.Errorf("no events to post")
+	return p.PostEventsWithHolidays(events, nil)
+}
+
+// PostEventsWithHolidays posts selected events and holidays to Slack
+func (p *Poster) PostEventsWithHolidays(events []llm.SelectedEvent, holidays []string) error {
+	if len(events) == 0 && len(holidays) == 0 {
+		return fmt.Errorf("no events or holidays to post")
 	}
 
-	message := p.formatMessage(events)
+	message := p.formatMessageWithHolidays(events, holidays)
 
 	reqBody, err := json.Marshal(message)
 	if err != nil {
@@ -94,6 +99,11 @@ func (p *Poster) PostEvents(events []llm.SelectedEvent) error {
 
 // formatMessage formats events into a Slack message with blocks
 func (p *Poster) formatMessage(events []llm.SelectedEvent) SlackMessage {
+	return p.formatMessageWithHolidays(events, nil)
+}
+
+// formatMessageWithHolidays formats events and holidays into a Slack message with blocks
+func (p *Poster) formatMessageWithHolidays(events []llm.SelectedEvent, holidays []string) SlackMessage {
 	now := time.Now()
 	dateStr := now.Format("Monday, January 2")
 
@@ -109,6 +119,38 @@ func (p *Poster) formatMessage(events []llm.SelectedEvent) SlackMessage {
 		{
 			Type: "divider",
 		},
+	}
+
+	// Add holidays section if present
+	if len(holidays) > 0 {
+		blocks = append(blocks, Block{
+			Type: "section",
+			Text: &TextObject{
+				Type: "mrkdwn",
+				Text: "*🎉 Today's Fun Holidays*",
+			},
+		})
+
+		// Add each holiday
+		holidayText := ""
+		for i, holiday := range holidays {
+			if i > 0 {
+				holidayText += "\n"
+			}
+			holidayText += fmt.Sprintf("• %s", holiday)
+		}
+
+		blocks = append(blocks, Block{
+			Type: "section",
+			Text: &TextObject{
+				Type: "mrkdwn",
+				Text: holidayText,
+			},
+		})
+
+		blocks = append(blocks, Block{
+			Type: "divider",
+		})
 	}
 
 	// Add each event as a section
