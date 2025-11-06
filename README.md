@@ -1,10 +1,11 @@
 # History Slackbot
 
-A Go-based Slack bot that posts interesting "Today in History" events daily. The bot fetches historical events from RSS feeds, uses Claude AI to select the most interesting ones, and posts them to Slack with beautiful formatting.
+A Go-based Slack bot that posts interesting "Today in History" events and fun holidays daily. The bot fetches historical events from RSS feeds, uses Claude AI to select the most interesting ones, and posts them to Slack with beautiful formatting.
 
 ## Features
 
 - Fetches historical events from RSS feeds
+- Fetches fun/unusual holidays (filtered to exclude serious observances)
 - Uses Anthropic's Claude AI to intelligently select interesting, rare, or significant events
 - Posts beautifully formatted messages to Slack
 - Configurable scheduling (default: daily at 9 AM)
@@ -60,10 +61,12 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
 CLAUDE_API_KEY=sk-ant-api03-xxx
 
 # Optional (defaults shown)
-CLAUDE_MODEL=claude-3-5-sonnet-20241022
+CLAUDE_MODEL=claude-sonnet-4-5
 RSS_FEED_URL=https://www.onthisday.com/rss/today-in-history.xml
+HOLIDAY_FEED_URL=https://api.checkiday.com/rss?tz=America/New_York
 SCHEDULE_CRON=0 9 * * *  # 9 AM daily
-MAX_EVENTS=2
+MAX_EVENTS=1
+MAX_HOLIDAYS=2
 RUN_ONCE=false
 ```
 
@@ -150,10 +153,12 @@ docker-compose up -d
 |----------|-------------|---------|
 | `SLACK_WEBHOOK_URL` | Slack incoming webhook URL | Required |
 | `CLAUDE_API_KEY` | Anthropic Claude API key | Required |
-| `CLAUDE_MODEL` | Claude model to use | `claude-3-5-sonnet-20241022` |
-| `RSS_FEED_URL` | RSS feed URL(s) | `https://www.onthisday.com/rss/today-in-history.xml` |
+| `CLAUDE_MODEL` | Claude model to use | `claude-sonnet-4-5` |
+| `RSS_FEED_URL` | Historical events RSS feed URL | `https://www.onthisday.com/rss/today-in-history.xml` |
+| `HOLIDAY_FEED_URL` | Fun holidays RSS feed URL | `https://api.checkiday.com/rss?tz=America/New_York` |
 | `SCHEDULE_CRON` | Cron expression for scheduling | `0 9 * * *` (9 AM daily) |
-| `MAX_EVENTS` | Number of events to select | `2` |
+| `MAX_EVENTS` | Number of historical events to select | `1` |
+| `MAX_HOLIDAYS` | Number of fun holidays to display | `2` |
 | `RUN_ONCE` | Run once and exit | `false` |
 | `EVENT_SELECTION_PROMPT` | Custom LLM prompt | Default prompt |
 
@@ -227,13 +232,14 @@ golint ./...
 ## How It Works
 
 1. **Scheduler** - Runs the job at the configured time (or immediately if `RUN_ONCE=true`)
-2. **RSS Parser** - Fetches historical events from the configured RSS feed(s)
-3. **LLM Selector** - Sends events to Claude AI to select the most interesting ones based on:
+2. **RSS Parser** - Fetches historical events and fun holidays from configured RSS feeds
+3. **Holiday Filter** - Filters out serious/political holidays, keeping only fun ones
+4. **LLM Selector** - Sends events to Claude AI to select the most interesting ones based on:
    - Historical significance
    - Rarity or uniqueness
    - General audience interest
    - Variety across time periods and categories
-4. **Slack Poster** - Formats and posts the selected events to Slack with rich formatting
+5. **Slack Poster** - Formats and posts the holidays and selected events to Slack with rich formatting
 
 ## Example Output
 
@@ -244,6 +250,12 @@ The bot posts messages to Slack with this format:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+🎉 Today's Fun Holidays
+• National Nachos Day
+• National Saxophone Day
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 1860 • Politics
 Abraham Lincoln Elected President
 Abraham Lincoln was elected as the 16th President of the United States,
@@ -252,46 +264,8 @@ the secession of Southern states and ultimately led to the Civil War.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1928 • Science
-Sliced Bread Invented
-Otto Frederick Rohwedder invented the first commercial bread-slicing
-machine, revolutionizing the baking industry and giving us the phrase
-"the greatest thing since sliced bread."
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 Curated by AI from today's historical events
 ```
-
-## Troubleshooting
-
-### Bot doesn't post to Slack
-
-- Verify your `SLACK_WEBHOOK_URL` is correct
-- Test the webhook manually with curl:
-  ```bash
-  curl -X POST -H 'Content-type: application/json' \
-    --data '{"text":"Test message"}' \
-    YOUR_WEBHOOK_URL
-  ```
-
-### LLM selection fails
-
-- Verify your `CLAUDE_API_KEY` is valid
-- Check you have API credits available
-- Ensure you're using a supported model
-
-### RSS feed fails to fetch
-
-- Check the RSS feed URL is accessible
-- Try the feed URL in a browser
-- Check for network/firewall issues
-
-### Scheduler not running at expected time
-
-- Verify the cron expression is correct
-- Check the server time zone matches your expectations
-- Look at the logs for "Next scheduled run" messages
 
 ## License
 
