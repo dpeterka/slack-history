@@ -35,3 +35,4 @@ history-slackbot
 
 # Logs
 *.log
+.cache/

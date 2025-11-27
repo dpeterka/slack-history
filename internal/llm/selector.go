@@ -13,10 +13,10 @@ import (
 
 // Selector uses an LLM to select interesting events
 type Selector struct {
-	apiKey      string
-	model       string
-	client      *http.Client
-	maxEvents   int
+	apiKey         string
+	model          string
+	client         *http.Client
+	maxEvents      int
 	promptTemplate string
 }
 
@@ -26,6 +26,7 @@ type SelectedEvent struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Category    string `json:"category"`
+	WikiURL     string `json:"-"` // Not from LLM, populated later
 }
 
 // SelectionResponse represents the LLM's response
@@ -36,9 +37,9 @@ type SelectionResponse struct {
 // NewSelector creates a new event selector
 func NewSelector(apiKey, model string, maxEvents int, promptTemplate string) *Selector {
 	return &Selector{
-		apiKey:      apiKey,
-		model:       model,
-		maxEvents:   maxEvents,
+		apiKey:         apiKey,
+		model:          model,
+		maxEvents:      maxEvents,
 		promptTemplate: promptTemplate,
 		client: &http.Client{
 			Timeout: 60 * time.Second,
@@ -112,12 +113,12 @@ type Message struct {
 
 // ClaudeResponse represents the response from Claude API
 type ClaudeResponse struct {
-	ID      string          `json:"id"`
-	Type    string          `json:"type"`
-	Role    string          `json:"role"`
-	Content []ContentBlock  `json:"content"`
-	Model   string          `json:"model"`
-	Usage   UsageInfo       `json:"usage"`
+	ID      string         `json:"id"`
+	Type    string         `json:"type"`
+	Role    string         `json:"role"`
+	Content []ContentBlock `json:"content"`
+	Model   string         `json:"model"`
+	Usage   UsageInfo      `json:"usage"`
 }
 
 // ContentBlock represents a content block in Claude's response

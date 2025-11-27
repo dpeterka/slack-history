@@ -7,12 +7,17 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
+	"github.com/dpeterka/history-slackbot/internal/cache"
 	"github.com/dpeterka/history-slackbot/internal/config"
+	"github.com/dpeterka/history-slackbot/internal/funfacts"
+	"github.com/dpeterka/history-slackbot/internal/holidays"
 	"github.com/dpeterka/history-slackbot/internal/llm"
 	"github.com/dpeterka/history-slackbot/internal/rss"
 	"github.com/dpeterka/history-slackbot/internal/scheduler"
 	"github.com/dpeterka/history-slackbot/internal/slack"
+	"github.com/dpeterka/history-slackbot/internal/wikipedia"
 )
 
 func main() {
@@ -35,21 +40,7 @@ func main() {
 	job := createJob(cfg)
 
 	// Create scheduler
-	var sched *scheduler.Scheduler
-	if cfg.RunOnce {
-		// Run once and exit
-		sched = scheduler.NewScheduler(job, 0, true)
-	} else {
-		// Parse cron expression and calculate next run time
-		nextRun, err := scheduler.NextRunTime(cfg.ScheduleCron)
-		if err != nil {
-			log.Fatalf("Failed to parse cron expression: %v", err)
-		}
-
-		log.Printf("Next scheduled run: %v", nextRun)
-
-		sched = scheduler.NewScheduler(job, scheduler.DailyInterval(), false)
-	}
+	sched := scheduler.NewScheduler(job, 0, cfg.RunOnce)
 
 	// Setup signal handling for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
@@ -61,13 +52,9 @@ func main() {
 	// Start scheduler in a goroutine
 	errChan := make(chan error, 1)
 	go func() {
-		if cfg.RunOnce {
-			errChan <- sched.Start(ctx)
-		} else {
-			// Start at the next scheduled time
-			nextRun, _ := scheduler.NextRunTime(cfg.ScheduleCron)
-			errChan <- sched.StartAt(ctx, nextRun)
-		}
+		// Convert "minute hour * * *" to cron format with seconds "0 minute hour * * *"
+		cronExpr := "0 " + cfg.ScheduleCron
+		errChan <- sched.StartWithCron(ctx, cronExpr)
 	}()
 
 	// Wait for shutdown signal or error
@@ -128,28 +115,91 @@ func createJob(cfg *config.Config) scheduler.Job {
 	return func(ctx context.Context) error {
 		log.Println("=== Starting job execution ===")
 
+		// Check if today is a weekend (skip posting on weekends)
+		now := time.Now()
+		weekday := now.Weekday()
+		if weekday == time.Saturday || weekday == time.Sunday {
+			log.Printf("Skipping post - today is %s (weekend)", weekday)
+			return nil
+		}
+
+		// Use configured max events
+		maxEvents := cfg.MaxEvents
+		log.Printf("Today is %s - posting %d event(s)", weekday, maxEvents)
+
+		// Initialize event history cache
+		eventHistory, err := cache.NewEventHistory(cfg.CacheDir)
+		if err != nil {
+			log.Printf("Warning: failed to initialize event cache: %v", err)
+			eventHistory = nil
+		} else {
+			// Cleanup old events
+			if err := eventHistory.Cleanup(cfg.ContentRotationWeeks * 2); err != nil {
+				log.Printf("Warning: failed to cleanup cache: %v", err)
+			}
+		}
+
 		// Create RSS parser
 		parser := rss.NewParser()
 
 		// Fetch events from RSS feeds
 		log.Printf("Fetching events from %d feed(s)...", len(cfg.RSSFeedURLs))
-		events, err := parser.FetchMultipleFeeds(cfg.RSSFeedURLs)
+		allEvents, err := parser.FetchMultipleFeeds(cfg.RSSFeedURLs)
 		if err != nil {
 			return err
 		}
-		log.Printf("Fetched %d events", len(events))
+		log.Printf("Fetched %d events", len(allEvents))
+
+		// Filter out recently posted events
+		var events []rss.HistoricalEvent
+		if eventHistory != nil {
+			for _, event := range allEvents {
+				if !eventHistory.WasRecentlyPosted(event.Title, event.Year, cfg.ContentRotationWeeks) {
+					events = append(events, event)
+				}
+			}
+			log.Printf("After filtering recent posts: %d events remain", len(events))
+		} else {
+			events = allEvents
+		}
 
 		// Select interesting events using LLM
 		log.Println("Selecting interesting events using Claude...")
-		selector := llm.NewSelector(cfg.ClaudeAPIKey, cfg.ClaudeModel, cfg.MaxEvents, cfg.EventSelectionPrompt)
+		selector := llm.NewSelector(cfg.ClaudeAPIKey, cfg.ClaudeModel, maxEvents, cfg.EventSelectionPrompt)
 		selectedEvents, err := selector.SelectEvents(events)
 		if err != nil {
 			return err
 		}
 		log.Printf("Selected %d events", len(selectedEvents))
 
+		// Fetch Wikipedia URLs for selected events
+		log.Println("Fetching Wikipedia URLs for events...")
+		for i := range selectedEvents {
+			url, err := wikipedia.SearchWikipediaURL(selectedEvents[i].Title)
+			if err != nil {
+				log.Printf("Warning: failed to get Wikipedia URL for '%s': %v", selectedEvents[i].Title, err)
+			} else {
+				selectedEvents[i].WikiURL = url
+			}
+		}
+
+		// Add selected events to cache
+		if eventHistory != nil {
+			for _, event := range selectedEvents {
+				if err := eventHistory.AddEvent(event.Title, event.Year, event.Description); err != nil {
+					log.Printf("Warning: failed to cache event: %v", err)
+				}
+			}
+		}
+
+		// Check for major holidays
+		majorHoliday, hasMajorHoliday := holidays.GetTodaysMajorHoliday()
+		if hasMajorHoliday {
+			log.Printf("Today is a major holiday: %s", majorHoliday)
+		}
+
 		// Fetch holidays
-		var holidays []string
+		var funHolidays []rss.Holiday
 		if cfg.HolidayFeedURL != "" {
 			log.Println("Fetching fun holidays...")
 			holidayData, err := parser.FetchHolidays(cfg.HolidayFeedURL)
@@ -158,25 +208,70 @@ func createJob(cfg *config.Config) scheduler.Job {
 			} else {
 				log.Printf("Fetched %d holidays", len(holidayData))
 				// Filter for fun holidays (skip serious/political ones)
-				funHolidays := filterFunHolidays(holidayData)
-				log.Printf("Filtered to %d fun holidays", len(funHolidays))
+				filteredHolidays := filterFunHolidays(holidayData)
+				log.Printf("Filtered to %d fun holidays", len(filteredHolidays))
 
 				// Limit to MaxHolidays
 				maxCount := cfg.MaxHolidays
-				if maxCount > len(funHolidays) {
-					maxCount = len(funHolidays)
+				if maxCount > len(filteredHolidays) {
+					maxCount = len(filteredHolidays)
 				}
 				for i := 0; i < maxCount; i++ {
-					holidays = append(holidays, funHolidays[i].Title)
+					funHolidays = append(funHolidays, filteredHolidays[i])
 				}
-				log.Printf("Selected %d holidays to display", len(holidays))
+				log.Printf("Selected %d holidays to display", len(funHolidays))
 			}
 		}
 
-		// Post to Slack
+		// Fetch notable people from Wikipedia API (for rotation)
+		var notablePeople []wikipedia.Person
+		if cfg.IncludePeople {
+			log.Println("Fetching notable births and deaths from Wikipedia...")
+			now := time.Now()
+			people, err := wikipedia.FetchBirthsAndDeaths(int(now.Month()), now.Day(), cfg.MaxPeople)
+			if err != nil {
+				log.Printf("Warning: failed to fetch people from Wikipedia: %v", err)
+			} else {
+				notablePeople = people
+				log.Printf("Fetched %d notable people from Wikipedia", len(notablePeople))
+			}
+		}
+
+		// Select daily variety content (emo, blobby, wikihow, quote, hottub, gardening, people, events, holidays - all rotate)
+		var funFact *funfacts.FunFact
+		log.Println("Selecting daily variety content...")
+		funFact = funfacts.GetRandomFunFactWithData(
+			cfg.IncludeEmoComment,
+			cfg.IncludeBlobbyFact,
+			cfg.IncludeWikiHow,
+			cfg.IncludeQuote,
+			cfg.IncludeHotTub,
+			cfg.IncludeGardening,
+			cfg.IncludePeople,
+			cfg.IncludeEvents,
+			funHolidays,    // Pass holidays for rotation
+			notablePeople,  // Pass people for rotation
+			cfg.MaxPeople,
+			cfg.TestDateSeed,
+		)
+		if funFact != nil {
+			log.Printf("Selected %s", funFact.GetDisplayTitle())
+			if funFact.Text != "" {
+				log.Printf("Content: %s", funFact.Text)
+			}
+		}
+
+		// Post to Slack - only show events if rotation selected them
 		log.Println("Posting to Slack...")
 		poster := slack.NewPoster(cfg.SlackWebhookURL)
-		if err := poster.PostEventsWithHolidays(selectedEvents, holidays); err != nil {
+		var eventsToPost []llm.SelectedEvent
+		if funFact != nil && funFact.ShowEvents {
+			eventsToPost = selectedEvents
+			log.Printf("Posting %d events for Historical Event day", len(eventsToPost))
+		} else {
+			log.Println("Not posting events (rotation selected different content)")
+		}
+		if err := poster.PostComplete(eventsToPost, majorHoliday, nil, funFact); err != nil {
 			return err
 		}
 

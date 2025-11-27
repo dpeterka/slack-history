@@ -1,6 +1,7 @@
 package rss
 
 import (
+	"bytes"
 	"compress/gzip"
 	"encoding/xml"
 	"fmt"
@@ -8,6 +9,9 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
+
+	"github.com/andybalholm/brotli"
 )
 
 // Feed represents an RSS feed
@@ -65,6 +69,78 @@ func NewParser() *Parser {
 	}
 }
 
+// sanitizeXML fixes common XML issues in RSS feeds
+func sanitizeXML(body []byte) []byte {
+	// First, check for and remove BOM (Byte Order Mark)
+	if len(body) >= 3 && body[0] == 0xEF && body[1] == 0xBB && body[2] == 0xBF {
+		body = body[3:]
+	}
+
+	// Remove null bytes which are illegal in XML
+	body = bytes.ReplaceAll(body, []byte{0}, []byte{})
+
+	// Remove other control characters that are illegal in XML (except tab, newline, carriage return)
+	cleaned := make([]byte, 0, len(body))
+	for _, b := range body {
+		// Keep printable characters, tab (9), newline (10), carriage return (13)
+		if b >= 32 || b == 9 || b == 10 || b == 13 {
+			cleaned = append(cleaned, b)
+		}
+	}
+	body = cleaned
+
+	// Remove invalid UTF-8 sequences
+	if !utf8.Valid(body) {
+		v := make([]byte, 0, len(body))
+		for i := 0; i < len(body); {
+			r, size := utf8.DecodeRune(body[i:])
+			if r == utf8.RuneError && size == 1 {
+				i++
+				continue
+			}
+			v = append(v, body[i:i+size]...)
+			i += size
+		}
+		body = v
+	}
+
+	// Look for <?xml declaration and ensure it's at the very start
+	// Remove any whitespace before the XML declaration
+	xmlDeclStart := bytes.Index(body, []byte("<?xml"))
+	if xmlDeclStart > 0 {
+		body = body[xmlDeclStart:]
+	}
+
+	// Fix common HTML entity issues that aren't properly encoded in XML
+	// Convert problematic HTML entities to their actual characters
+	entityReplacements := map[string]string{
+		"&rsquo;":  "'",
+		"&lsquo;":  "'",
+		"&rdquo;":  "\"",
+		"&ldquo;":  "\"",
+		"&hellip;": "...",
+		"&ndash;":  "-",
+		"&mdash;":  "—",
+		"&nbsp;":   " ",
+		"&apos;":   "'",
+		"&raquo;":  ">>",
+		"&laquo;":  "<<",
+	}
+
+	for old, new := range entityReplacements {
+		body = bytes.ReplaceAll(body, []byte(old), []byte(new))
+	}
+
+	// Fix standalone ampersands that aren't part of entities
+	// This is a simple approach: replace & followed by space or certain punctuation
+	body = bytes.ReplaceAll(body, []byte("& "), []byte("&amp; "))
+	body = bytes.ReplaceAll(body, []byte("&\n"), []byte("&amp;\n"))
+	body = bytes.ReplaceAll(body, []byte("&\""), []byte("&amp;\""))
+	body = bytes.ReplaceAll(body, []byte("&'"), []byte("&amp;'"))
+
+	return body
+}
+
 // FetchAndParse fetches and parses an RSS feed from the given URL
 func (p *Parser) FetchAndParse(url string) ([]HistoricalEvent, error) {
 	// Create request with browser headers
@@ -74,11 +150,18 @@ func (p *Parser) FetchAndParse(url string) ([]HistoricalEvent, error) {
 	}
 
 	// Add Chrome browser headers to avoid 403 errors
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
 	req.Header.Set("Accept", "application/xml,text/xml,application/rss+xml,text/html;q=0.9,*/*;q=0.8")
-	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Accept-Encoding", "gzip, deflate, br")
 	req.Header.Set("Connection", "keep-alive")
 	req.Header.Set("Cache-Control", "max-age=0")
+	req.Header.Set("Referer", "https://www.google.com/")
+	req.Header.Set("Sec-Fetch-Dest", "document")
+	req.Header.Set("Sec-Fetch-Mode", "navigate")
+	req.Header.Set("Sec-Fetch-Site", "none")
+	req.Header.Set("Sec-Fetch-User", "?1")
+	req.Header.Set("Upgrade-Insecure-Requests", "1")
 
 	// Fetch the RSS feed
 	resp, err := p.client.Do(req)
@@ -91,15 +174,19 @@ func (p *Parser) FetchAndParse(url string) ([]HistoricalEvent, error) {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	// Handle gzip-compressed response
+	// Handle compressed response (gzip or brotli)
 	var reader io.Reader = resp.Body
-	if resp.Header.Get("Content-Encoding") == "gzip" {
+	contentEncoding := resp.Header.Get("Content-Encoding")
+	switch contentEncoding {
+	case "gzip":
 		gzipReader, err := gzip.NewReader(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
 		}
 		defer gzipReader.Close()
 		reader = gzipReader
+	case "br":
+		reader = brotli.NewReader(resp.Body)
 	}
 
 	// Read the response body
@@ -107,6 +194,9 @@ func (p *Parser) FetchAndParse(url string) ([]HistoricalEvent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
+
+	// Sanitize XML to fix common encoding and entity issues
+	body = sanitizeXML(body)
 
 	// Parse the XML
 	var feed Feed
@@ -211,11 +301,18 @@ func (p *Parser) FetchHolidays(url string) ([]Holiday, error) {
 	}
 
 	// Add Chrome browser headers
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
 	req.Header.Set("Accept", "application/xml,text/xml,application/rss+xml,text/html;q=0.9,*/*;q=0.8")
-	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Accept-Encoding", "gzip, deflate, br")
 	req.Header.Set("Connection", "keep-alive")
 	req.Header.Set("Cache-Control", "max-age=0")
+	req.Header.Set("Referer", "https://www.google.com/")
+	req.Header.Set("Sec-Fetch-Dest", "document")
+	req.Header.Set("Sec-Fetch-Mode", "navigate")
+	req.Header.Set("Sec-Fetch-Site", "none")
+	req.Header.Set("Sec-Fetch-User", "?1")
+	req.Header.Set("Upgrade-Insecure-Requests", "1")
 
 	// Fetch the RSS feed
 	resp, err := p.client.Do(req)
@@ -228,15 +325,19 @@ func (p *Parser) FetchHolidays(url string) ([]Holiday, error) {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	// Handle gzip-compressed response
+	// Handle compressed response (gzip or brotli)
 	var reader io.Reader = resp.Body
-	if resp.Header.Get("Content-Encoding") == "gzip" {
+	contentEncoding := resp.Header.Get("Content-Encoding")
+	switch contentEncoding {
+	case "gzip":
 		gzipReader, err := gzip.NewReader(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
 		}
 		defer gzipReader.Close()
 		reader = gzipReader
+	case "br":
+		reader = brotli.NewReader(resp.Body)
 	}
 
 	// Read the response body
@@ -244,6 +345,9 @@ func (p *Parser) FetchHolidays(url string) ([]Holiday, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
+
+	// Sanitize XML to fix common encoding and entity issues
+	body = sanitizeXML(body)
 
 	// Parse the XML
 	var feed Feed

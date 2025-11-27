@@ -78,13 +78,13 @@ func TestExtractJSON(t *testing.T) {
 			expected: `{"events": []}`,
 		},
 		{
-			name: "JSON in markdown code block with json tag",
-			input: "```json\n{\"events\": []}\n```",
+			name:     "JSON in markdown code block with json tag",
+			input:    "```json\n{\"events\": []}\n```",
 			expected: "\n{\"events\": []}\n",
 		},
 		{
-			name: "JSON in markdown code block without tag",
-			input: "```\n{\"events\": []}\n```",
+			name:     "JSON in markdown code block without tag",
+			input:    "```\n{\"events\": []}\n```",
 			expected: "\n{\"events\": []}\n",
 		},
 		{
@@ -139,8 +139,8 @@ func TestParseSelection(t *testing.T) {
 			},
 		},
 		{
-			name: "Valid JSON in markdown",
-			response: "```json\n{\"events\": [{\"year\": \"1776\", \"title\": \"Independence\", \"description\": \"US declares independence\", \"category\": \"Politics\"}]}\n```",
+			name:        "Valid JSON in markdown",
+			response:    "```json\n{\"events\": [{\"year\": \"1776\", \"title\": \"Independence\", \"description\": \"US declares independence\", \"category\": \"Politics\"}]}\n```",
 			expectError: false,
 			validate: func(t *testing.T, events []SelectedEvent) {
 				if len(events) != 1 {

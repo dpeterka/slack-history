@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"time"
+
+	"github.com/robfig/cron/v3"
 )
 
 // Job represents a scheduled job
@@ -80,11 +82,21 @@ func (s *Scheduler) StartAt(ctx context.Context, firstRun time.Time) error {
 	// Calculate delay until first run
 	delay := time.Until(firstRun)
 	if delay < 0 {
-		// If the time has already passed today, schedule for tomorrow
-		delay = delay + 24*time.Hour
-	}
+		// If the time has already passed, run immediately and schedule next for tomorrow
+		log.Printf("Scheduled time has passed, running immediately...")
+		if err := s.job(ctx); err != nil {
+			log.Printf("Immediate job failed: %v", err)
+		} else {
+			log.Printf("Immediate job completed successfully")
+		}
 
-	log.Printf("Waiting %v until first run...", delay)
+		// Calculate next run time (tomorrow at the same time)
+		firstRun = firstRun.Add(24 * time.Hour)
+		delay = time.Until(firstRun)
+		log.Printf("Next run scheduled for %v (in %v)", firstRun, delay)
+	} else {
+		log.Printf("Waiting %v until first run...", delay)
+	}
 
 	// Wait for the first run time
 	timer := time.NewTimer(delay)
@@ -140,4 +152,53 @@ func NextRunTime(cronExpr string) (time.Time, error) {
 // DailyInterval returns the duration for daily scheduling
 func DailyInterval() time.Duration {
 	return 24 * time.Hour
+}
+
+// StartWithCron starts the scheduler using a cron expression
+func (s *Scheduler) StartWithCron(ctx context.Context, cronExpr string) error {
+	// If runOnce is true, execute immediately and return
+	if s.runOnce {
+		log.Printf("Running job once...")
+		if err := s.job(ctx); err != nil {
+			return fmt.Errorf("job failed: %w", err)
+		}
+		log.Printf("Job completed successfully")
+		return nil
+	}
+
+	// Create new cron scheduler with seconds precision
+	c := cron.New(cron.WithSeconds())
+
+	// Add job to cron
+	_, err := c.AddFunc(cronExpr, func() {
+		log.Printf("Running scheduled job...")
+		if err := s.job(ctx); err != nil {
+			log.Printf("Scheduled job failed: %v", err)
+		} else {
+			log.Printf("Scheduled job completed successfully")
+		}
+	})
+	if err != nil {
+		return fmt.Errorf("failed to add cron job: %w", err)
+	}
+
+	// Start the cron scheduler
+	c.Start()
+	log.Printf("Cron scheduler started with expression: %s", cronExpr)
+
+	// Get next run time
+	entries := c.Entries()
+	if len(entries) > 0 {
+		log.Printf("Next scheduled run: %v", entries[0].Next)
+	}
+
+	// Wait for context cancellation
+	<-ctx.Done()
+
+	// Stop the cron scheduler
+	cronCtx := c.Stop()
+	<-cronCtx.Done()
+	log.Printf("Cron scheduler stopped")
+
+	return ctx.Err()
 }
