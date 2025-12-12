@@ -7,6 +7,7 @@ import (
 	"github.com/dpeterka/history-slackbot/internal/emo"
 	"github.com/dpeterka/history-slackbot/internal/gardening"
 	"github.com/dpeterka/history-slackbot/internal/hottub"
+	"github.com/dpeterka/history-slackbot/internal/printing3d"
 	"github.com/dpeterka/history-slackbot/internal/quotes"
 	"github.com/dpeterka/history-slackbot/internal/rss"
 	"github.com/dpeterka/history-slackbot/internal/wikipedia"
@@ -16,7 +17,7 @@ import (
 // FunFact represents a fun fact of any type
 type FunFact struct {
 	Text           string
-	Type           string              // "emo", "blobby", "wikihow", "quote", "holidays", "hottub", "gardening", "people", "events"
+	Type           string              // "emo", "blobby", "wikihow", "quote", "holidays", "hottub", "gardening", "printing3d", "people", "events"
 	Category       string
 	URL            string              // For wikihow articles
 	Author         string              // For quotes
@@ -27,14 +28,66 @@ type FunFact struct {
 
 // GetRandomFunFact returns a random fun fact from all available types
 // For holidays, pass them via GetRandomFunFactWithData
-func GetRandomFunFact(includeEmo, includeBlobby, includeWikiHow, includeQuote, includeHotTub, includeGardening, includePeople, includeEvents bool) *FunFact {
-	return GetRandomFunFactWithData(includeEmo, includeBlobby, includeWikiHow, includeQuote, includeHotTub, includeGardening, includePeople, includeEvents, nil, nil, 0, 0)
+func GetRandomFunFact(includeEmo, includeBlobby, includeWikiHow, includeQuote, includeHotTub, includeGardening, includePrinting3D, includePeople, includeEvents bool) *FunFact {
+	return GetRandomFunFactWithData(includeEmo, includeBlobby, includeWikiHow, includeQuote, includeHotTub, includeGardening, includePrinting3D, includePeople, includeEvents, nil, nil, 0, 0)
+}
+
+// DetermineContentType returns what content type will be selected for today without fetching data
+// This allows the caller to only fetch data for the selected type
+func DetermineContentType(includeEmo, includeBlobby, includeWikiHow, includeQuote, includeHotTub, includeGardening, includePrinting3D, includePeople, includeEvents, includeHolidays bool, seed int) string {
+	// Use provided seed or current date for seed
+	if seed == 0 {
+		now := time.Now()
+		seed = now.Year()*10000 + int(now.Month())*100 + now.Day()
+	}
+
+	// Count how many types are enabled (without requiring data)
+	enabledTypes := []string{}
+	if includeEmo {
+		enabledTypes = append(enabledTypes, "emo")
+	}
+	if includeBlobby {
+		enabledTypes = append(enabledTypes, "blobby")
+	}
+	if includeWikiHow {
+		enabledTypes = append(enabledTypes, "wikihow")
+	}
+	if includeQuote {
+		enabledTypes = append(enabledTypes, "quote")
+	}
+	if includeHotTub {
+		enabledTypes = append(enabledTypes, "hottub")
+	}
+	if includeGardening {
+		enabledTypes = append(enabledTypes, "gardening")
+	}
+	if includePrinting3D {
+		enabledTypes = append(enabledTypes, "printing3d")
+	}
+	if includePeople {
+		enabledTypes = append(enabledTypes, "people")
+	}
+	if includeEvents {
+		enabledTypes = append(enabledTypes, "events")
+	}
+	if includeHolidays {
+		enabledTypes = append(enabledTypes, "holidays")
+	}
+
+	// If none enabled, return empty
+	if len(enabledTypes) == 0 {
+		return ""
+	}
+
+	// Rotate between enabled types based on day
+	dayOfYear := seed % 1000 // Get just the day portion (MMDD)
+	return enabledTypes[dayOfYear%len(enabledTypes)]
 }
 
 // GetRandomFunFactWithData returns a random fun fact with optional holidays and people data, and seed override
 // If seed is 0, uses current date. Otherwise uses the provided seed for testing.
 // Rotates between enabled types based on day
-func GetRandomFunFactWithData(includeEmo, includeBlobby, includeWikiHow, includeQuote, includeHotTub, includeGardening, includePeople, includeEvents bool, holidays []rss.Holiday, people []wikipedia.Person, maxPeople, seed int) *FunFact {
+func GetRandomFunFactWithData(includeEmo, includeBlobby, includeWikiHow, includeQuote, includeHotTub, includeGardening, includePrinting3D, includePeople, includeEvents bool, holidays []rss.Holiday, people []wikipedia.Person, maxPeople, seed int) *FunFact {
 	// Use provided seed or current date for seed
 	if seed == 0 {
 		now := time.Now()
@@ -60,6 +113,9 @@ func GetRandomFunFactWithData(includeEmo, includeBlobby, includeWikiHow, include
 	}
 	if includeGardening {
 		enabledTypes = append(enabledTypes, "gardening")
+	}
+	if includePrinting3D {
+		enabledTypes = append(enabledTypes, "printing3d")
 	}
 	if includePeople && len(people) > 0 {
 		enabledTypes = append(enabledTypes, "people")
@@ -128,6 +184,13 @@ func GetRandomFunFactWithData(includeEmo, includeBlobby, includeWikiHow, include
 			Type:     "gardening",
 			Category: gardeningTip.Category,
 		}
+	case "printing3d":
+		printing3dTip := printing3d.GetRandomTipWithSeed(seed)
+		return &FunFact{
+			Text:     printing3dTip.Text,
+			Type:     "printing3d",
+			Category: printing3dTip.Category,
+		}
 	case "people":
 		return &FunFact{
 			Type:          "people",
@@ -163,6 +226,8 @@ func (f *FunFact) GetDisplayTitle() string {
 		return "🛁 Hot Tub Care Tip"
 	case "gardening":
 		return "🌱 Gardening Tip"
+	case "printing3d":
+		return "🖨️ 3D Printing Tip"
 	case "people":
 		return "🎂 Notable People"
 	case "events":

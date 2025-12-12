@@ -20,7 +20,12 @@ A Go-based Slack bot that posts interesting "Today in History" events and fun ho
 - **Quote of the Day** - Inspirational quotes from historical figures (via ZenQuotes API with fallback quotes)
 - **Emo Comments** - Daily philosophical/emo observations about work, life, and relationships (44 unique comments)
 - **Mr Blobby Facts** - Daily fascinating facts about the legendary Mr Blobby (47 unique facts covering Origins, Music, Theme Parks, TV, Legacy, and Controversies)
-- **Notable Births & Deaths** - Highlights significant people born or died on this day
+- **WikiHow Articles** - Random WikiHow article suggestions
+- **Hot Tub Care Tips** - Practical hot tub maintenance advice with personality
+- **Gardening Tips** - Vegetable and hydroponic gardening wisdom
+- **3D Printing Tips** - Practical 3D printing advice covering bed adhesion, filament, troubleshooting, and more (50 unique tips)
+- **Notable Births & Deaths** - Highlights significant people born or died on this day (via Wikipedia API)
+- **Historical Events** - Interesting historical events from this day in history (AI-curated for uniqueness)
 - **Content Rotation System** - Prevents repeating events for configurable weeks (default: 6 weeks)
 - **Event History Cache** - Tracks posted events to ensure fresh content
 - **Geographic Diversity** - AI prioritizes events from different countries and regions (not just US-centric)
@@ -45,7 +50,13 @@ The project follows Go best practices with a clean architecture:
 - `internal/quotes/` - Quote of the day fetcher (ZenQuotes API)
 - `internal/emo/` - Emo/philosophical comment generator (44 unique comments)
 - `internal/blobby/` - Mr Blobby fact generator (47 unique facts)
-- `internal/people/` - Notable births/deaths extraction and filtering
+- `internal/wikihow/` - WikiHow article selector
+- `internal/hottub/` - Hot tub care tip generator
+- `internal/gardening/` - Gardening tip generator
+- `internal/printing3d/` - 3D printing tip generator (50 unique tips)
+- `internal/people/` - Notable births/deaths extraction and filtering (Wikipedia API)
+- `internal/wikipedia/` - Wikipedia API integration for people and event links
+- `internal/funfacts/` - Daily content rotation coordinator
 - `internal/cache/` - Event history tracking for content rotation
 
 ## Prerequisites
@@ -92,6 +103,7 @@ SCHEDULE_CRON=0 9 * * *  # 9 AM daily
 MAX_EVENTS=1
 MAX_HOLIDAYS=2
 RUN_ONCE=false
+SKIP_INITIAL_RUN=false  # Set to true to skip running on container startup
 ```
 
 ## Setup Guide
@@ -190,10 +202,16 @@ docker-compose up -d
 | `INCLUDE_QUOTE` | Include quote of the day | `true` |
 | `INCLUDE_EMO_COMMENT` | Include emo/philosophical comment | `true` |
 | `INCLUDE_BLOBBY_FACT` | Include Mr Blobby fact | `true` |
+| `INCLUDE_WIKIHOW` | Include WikiHow articles | `true` |
+| `INCLUDE_HOTTUB` | Include hot tub care tips | `true` |
+| `INCLUDE_GARDENING` | Include gardening tips | `true` |
+| `INCLUDE_PRINTING3D` | Include 3D printing tips | `true` |
 | `INCLUDE_PEOPLE` | Include notable births/deaths | `true` |
+| `INCLUDE_EVENTS` | Include historical events | `true` |
 | `MAX_PEOPLE` | Max number of notable people to display | `2` |
 | `CACHE_DIR` | Directory for event history cache | `.cache` |
 | `CONTENT_ROTATION_WEEKS` | Weeks before repeating an event | `6` |
+| `SKIP_INITIAL_RUN` | Skip running on startup, only use schedule | `false` |
 | **Advanced** | | |
 | `EVENT_SELECTION_PROMPT` | Custom LLM prompt (overrides diversity scoring) | Default prompt |
 
@@ -353,7 +371,6 @@ New Jersey. This bold move became a turning point in the Revolutionary War.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Curated by AI from today's historical events
 ```
 
 **Notes:**

@@ -5,7 +5,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // Config holds the application configuration
@@ -24,8 +23,9 @@ type Config struct {
 	HolidayFeedURL string
 
 	// Scheduler configuration
-	ScheduleCron string // Cron expression for scheduling
-	RunOnce      bool   // Run once and exit (for testing)
+	ScheduleCron     string // Cron expression for scheduling
+	RunOnce          bool   // Run once and exit (for testing)
+	SkipInitialRun   bool   // Skip running immediately on startup, only use schedule
 
 	// LLM prompt configuration
 	MaxEvents            int // Maximum number of events to select
@@ -40,6 +40,7 @@ type Config struct {
 	IncludeWikiHow       bool   // Include WikiHow articles
 	IncludeHotTub        bool   // Include hot tub care tips
 	IncludeGardening     bool   // Include gardening tips
+	IncludePrinting3D    bool   // Include 3D printing tips
 	IncludeEvents        bool   // Include historical events
 	MaxPeople            int    // Maximum number of people to display
 	CacheDir             string // Directory for event history cache
@@ -55,6 +56,7 @@ func Load() (*Config, error) {
 		ClaudeModel:          getEnvOrDefault("CLAUDE_MODEL", "claude-sonnet-4-5"),
 		ScheduleCron:         getEnvOrDefault("SCHEDULE_CRON", "0 9 * * *"), // Default: 9 AM daily
 		RunOnce:              getEnvBool("RUN_ONCE", false),
+		SkipInitialRun:       getEnvBool("SKIP_INITIAL_RUN", false),
 		MaxEvents:            getEnvInt("MAX_EVENTS", 1),
 		MaxHolidays:          getEnvInt("MAX_HOLIDAYS", 2),
 		IncludeQuote:         getEnvBool("INCLUDE_QUOTE", true),
@@ -64,6 +66,7 @@ func Load() (*Config, error) {
 		IncludeWikiHow:       getEnvBool("INCLUDE_WIKIHOW", true),
 		IncludeHotTub:        getEnvBool("INCLUDE_HOTTUB", true),
 		IncludeGardening:     getEnvBool("INCLUDE_GARDENING", true),
+		IncludePrinting3D:    getEnvBool("INCLUDE_PRINTING3D", true),
 		IncludeEvents:        getEnvBool("INCLUDE_EVENTS", true),
 		MaxPeople:            getEnvInt("MAX_PEOPLE", 2),
 		CacheDir:             getEnvOrDefault("CACHE_DIR", ".cache"),
@@ -165,29 +168,4 @@ func parseCommaSeparated(s string) []string {
 		}
 	}
 	return result
-}
-
-// GetSchedule returns the next scheduled run time
-func (c *Config) GetSchedule() (time.Duration, error) {
-	// For now, we'll implement a simple daily schedule
-	// In a production system, you'd use a cron parser library
-	now := time.Now()
-
-	// Parse the cron expression (simplified - assumes "0 9 * * *" format)
-	// For a full implementation, use github.com/robfig/cron
-	hour := 9
-	if c.ScheduleCron != "" {
-		// Basic parsing for hour only
-		// Format: "minute hour * * *"
-		var minute int
-		fmt.Sscanf(c.ScheduleCron, "%d %d", &minute, &hour)
-	}
-
-	// Calculate next run time
-	nextRun := time.Date(now.Year(), now.Month(), now.Day(), hour, 0, 0, 0, now.Location())
-	if now.After(nextRun) {
-		nextRun = nextRun.Add(24 * time.Hour)
-	}
-
-	return nextRun.Sub(now), nil
 }

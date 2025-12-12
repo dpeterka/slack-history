@@ -46,19 +46,6 @@ func GetRandomCommentWithSeed(seed int) Comment {
 		{Text: "We're cosmic accidents on a floating rock, but somehow we still care about matching socks.", Category: "Life"},
 		{Text: "Life is like a box of chocolates: confusing, occasionally disappointing, and someone already ate the good ones.", Category: "Life"},
 
-		// Relationships
-		{Text: "Love is just two people agreeing to be weird together until one of them gets tired.", Category: "Relationships"},
-		{Text: "Relationships are like group projects where you're paired with someone as dysfunctional as you are.", Category: "Relationships"},
-		{Text: "They say communication is key. Nobody mentioned the door is locked from the inside.", Category: "Relationships"},
-		{Text: "Every relationship is just two damaged people deciding their traumas are compatible.", Category: "Relationships"},
-		{Text: "Being vulnerable is important. So is having a good therapist on speed dial.", Category: "Relationships"},
-		{Text: "Love languages: acts of service, quality time, and pretending you didn't hear that comment.", Category: "Relationships"},
-		{Text: "Relationships are 50% compromise and 50% wondering if you should have gotten a cat instead.", Category: "Relationships"},
-		{Text: "We're all just looking for someone who will tolerate our 3am anxiety spirals.", Category: "Relationships"},
-		{Text: "True love is finding someone whose emotional baggage fits in your trunk.", Category: "Relationships"},
-		{Text: "Intimacy is sharing your deepest fears and then immediately regretting it.", Category: "Relationships"},
-		{Text: "A healthy relationship is two people who occasionally like each other at the same time.", Category: "Relationships"},
-		{Text: "They say opposites attract. Mostly they just confuse each other loudly.", Category: "Relationships"},
 
 		// Mixed/General Angst
 		{Text: "Some days you're the pigeon. Other days you're the statue. Most days you're both.", Category: "Life"},
@@ -141,18 +128,5 @@ func getAllComments() []Comment {
 		{Text: "Life's a journey. Unfortunately, I forgot to check the map and now I'm lost in a Target parking lot.", Category: "Life"},
 		{Text: "We're all just extras in everyone else's story, hoping someone notices our cameo.", Category: "Life"},
 
-		// Relationships
-		{Text: "Love is just two people agreeing to be weird together until one of them gets tired.", Category: "Relationships"},
-		{Text: "Relationships are like group projects where you're paired with someone as dysfunctional as you are.", Category: "Relationships"},
-		{Text: "They say communication is key. Nobody mentioned the door is locked from the inside.", Category: "Relationships"},
-		{Text: "Every relationship is just two damaged people deciding their traumas are compatible.", Category: "Relationships"},
-		{Text: "Being vulnerable is important. So is having a good therapist on speed dial.", Category: "Relationships"},
-		{Text: "Love languages: acts of service, quality time, and pretending you didn't hear that comment.", Category: "Relationships"},
-		{Text: "Relationships are 50% compromise and 50% wondering if you should have gotten a cat instead.", Category: "Relationships"},
-		{Text: "We're all just looking for someone who will tolerate our 3am anxiety spirals.", Category: "Relationships"},
-		{Text: "True love is finding someone whose emotional baggage fits in your trunk.", Category: "Relationships"},
-		{Text: "Intimacy is sharing your deepest fears and then immediately regretting it.", Category: "Relationships"},
-		{Text: "A healthy relationship is two people who occasionally like each other at the same time.", Category: "Relationships"},
-		{Text: "They say opposites attract. Mostly they just confuse each other loudly.", Category: "Relationships"},
 	}
 }

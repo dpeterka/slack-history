@@ -35,12 +35,13 @@ func main() {
 	log.Printf("Max events: %d", cfg.MaxEvents)
 	log.Printf("Schedule: %s", cfg.ScheduleCron)
 	log.Printf("Run once: %v", cfg.RunOnce)
+	log.Printf("Skip initial run: %v", cfg.SkipInitialRun)
 
 	// Create the job that fetches and posts events
 	job := createJob(cfg)
 
 	// Create scheduler
-	sched := scheduler.NewScheduler(job, 0, cfg.RunOnce)
+	sched := scheduler.NewScheduler(job, 0, cfg.RunOnce, cfg.SkipInitialRun)
 
 	// Setup signal handling for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
@@ -127,80 +128,109 @@ func createJob(cfg *config.Config) scheduler.Job {
 		maxEvents := cfg.MaxEvents
 		log.Printf("Today is %s - posting %d event(s)", weekday, maxEvents)
 
-		// Initialize event history cache
-		eventHistory, err := cache.NewEventHistory(cfg.CacheDir)
-		if err != nil {
-			log.Printf("Warning: failed to initialize event cache: %v", err)
-			eventHistory = nil
-		} else {
-			// Cleanup old events
-			if err := eventHistory.Cleanup(cfg.ContentRotationWeeks * 2); err != nil {
-				log.Printf("Warning: failed to cleanup cache: %v", err)
-			}
-		}
+		// Determine what content type will be selected today (before fetching data)
+		log.Println("Determining today's content type...")
+		contentType := funfacts.DetermineContentType(
+			cfg.IncludeEmoComment,
+			cfg.IncludeBlobbyFact,
+			cfg.IncludeWikiHow,
+			cfg.IncludeQuote,
+			cfg.IncludeHotTub,
+			cfg.IncludeGardening,
+			cfg.IncludePrinting3D,
+			cfg.IncludePeople,
+			cfg.IncludeEvents,
+			cfg.HolidayFeedURL != "", // Include holidays if URL is configured
+			cfg.TestDateSeed,
+		)
+		log.Printf("Today's content type will be: %s", contentType)
 
-		// Create RSS parser
-		parser := rss.NewParser()
-
-		// Fetch events from RSS feeds
-		log.Printf("Fetching events from %d feed(s)...", len(cfg.RSSFeedURLs))
-		allEvents, err := parser.FetchMultipleFeeds(cfg.RSSFeedURLs)
-		if err != nil {
-			return err
-		}
-		log.Printf("Fetched %d events", len(allEvents))
-
-		// Filter out recently posted events
-		var events []rss.HistoricalEvent
-		if eventHistory != nil {
-			for _, event := range allEvents {
-				if !eventHistory.WasRecentlyPosted(event.Title, event.Year, cfg.ContentRotationWeeks) {
-					events = append(events, event)
-				}
-			}
-			log.Printf("After filtering recent posts: %d events remain", len(events))
-		} else {
-			events = allEvents
-		}
-
-		// Select interesting events using LLM
-		log.Println("Selecting interesting events using Claude...")
-		selector := llm.NewSelector(cfg.ClaudeAPIKey, cfg.ClaudeModel, maxEvents, cfg.EventSelectionPrompt)
-		selectedEvents, err := selector.SelectEvents(events)
-		if err != nil {
-			return err
-		}
-		log.Printf("Selected %d events", len(selectedEvents))
-
-		// Fetch Wikipedia URLs for selected events
-		log.Println("Fetching Wikipedia URLs for events...")
-		for i := range selectedEvents {
-			url, err := wikipedia.SearchWikipediaURL(selectedEvents[i].Title)
+		// Initialize event history cache (needed for events only)
+		var eventHistory *cache.EventHistory
+		if contentType == "events" {
+			var err error
+			eventHistory, err = cache.NewEventHistory(cfg.CacheDir)
 			if err != nil {
-				log.Printf("Warning: failed to get Wikipedia URL for '%s': %v", selectedEvents[i].Title, err)
+				log.Printf("Warning: failed to initialize event cache: %v", err)
+				eventHistory = nil
 			} else {
-				selectedEvents[i].WikiURL = url
-			}
-		}
-
-		// Add selected events to cache
-		if eventHistory != nil {
-			for _, event := range selectedEvents {
-				if err := eventHistory.AddEvent(event.Title, event.Year, event.Description); err != nil {
-					log.Printf("Warning: failed to cache event: %v", err)
+				// Cleanup old events
+				if err := eventHistory.Cleanup(cfg.ContentRotationWeeks * 2); err != nil {
+					log.Printf("Warning: failed to cleanup cache: %v", err)
 				}
 			}
 		}
 
-		// Check for major holidays
+		// Create RSS parser (needed for events and holidays)
+		var parser *rss.Parser
+		if contentType == "events" || contentType == "holidays" {
+			parser = rss.NewParser()
+		}
+
+		// Only fetch events if today's content is events
+		var selectedEvents []llm.SelectedEvent
+		if contentType == "events" {
+			log.Printf("Fetching events from %d feed(s)...", len(cfg.RSSFeedURLs))
+			allEvents, err := parser.FetchMultipleFeeds(cfg.RSSFeedURLs)
+			if err != nil {
+				return err
+			}
+			log.Printf("Fetched %d events", len(allEvents))
+
+			// Filter out recently posted events
+			var events []rss.HistoricalEvent
+			if eventHistory != nil {
+				for _, event := range allEvents {
+					if !eventHistory.WasRecentlyPosted(event.Title, event.Year, cfg.ContentRotationWeeks) {
+						events = append(events, event)
+					}
+				}
+				log.Printf("After filtering recent posts: %d events remain", len(events))
+			} else {
+				events = allEvents
+			}
+
+			// Select interesting events using LLM
+			log.Println("Selecting interesting events using Claude...")
+			selector := llm.NewSelector(cfg.ClaudeAPIKey, cfg.ClaudeModel, maxEvents, cfg.EventSelectionPrompt)
+			selectedEvents, err = selector.SelectEvents(events)
+			if err != nil {
+				return err
+			}
+			log.Printf("Selected %d events", len(selectedEvents))
+
+			// Fetch Wikipedia URLs for selected events
+			log.Println("Fetching Wikipedia URLs for events...")
+			for i := range selectedEvents {
+				url, err := wikipedia.SearchWikipediaURL(selectedEvents[i].Title)
+				if err != nil {
+					log.Printf("Warning: failed to get Wikipedia URL for '%s': %v", selectedEvents[i].Title, err)
+				} else {
+					selectedEvents[i].WikiURL = url
+				}
+			}
+
+			// Add selected events to cache
+			if eventHistory != nil {
+				for _, event := range selectedEvents {
+					if err := eventHistory.AddEvent(event.Title, event.Year, event.Description); err != nil {
+						log.Printf("Warning: failed to cache event: %v", err)
+					}
+				}
+			}
+		} else {
+			log.Println("Skipping event fetching (not today's content type)")
+		}
+
+		// Check for major holidays (always check, doesn't cost much)
 		majorHoliday, hasMajorHoliday := holidays.GetTodaysMajorHoliday()
 		if hasMajorHoliday {
 			log.Printf("Today is a major holiday: %s", majorHoliday)
 		}
 
-		// Fetch holidays
+		// Only fetch holidays if today's content is holidays
 		var funHolidays []rss.Holiday
-		if cfg.HolidayFeedURL != "" {
+		if contentType == "holidays" && cfg.HolidayFeedURL != "" {
 			log.Println("Fetching fun holidays...")
 			holidayData, err := parser.FetchHolidays(cfg.HolidayFeedURL)
 			if err != nil {
@@ -221,11 +251,13 @@ func createJob(cfg *config.Config) scheduler.Job {
 				}
 				log.Printf("Selected %d holidays to display", len(funHolidays))
 			}
+		} else if contentType != "holidays" {
+			log.Println("Skipping holiday fetching (not today's content type)")
 		}
 
-		// Fetch notable people from Wikipedia API (for rotation)
+		// Only fetch notable people if today's content is people
 		var notablePeople []wikipedia.Person
-		if cfg.IncludePeople {
+		if contentType == "people" && cfg.IncludePeople {
 			log.Println("Fetching notable births and deaths from Wikipedia...")
 			now := time.Now()
 			people, err := wikipedia.FetchBirthsAndDeaths(int(now.Month()), now.Day(), cfg.MaxPeople)
@@ -235,6 +267,8 @@ func createJob(cfg *config.Config) scheduler.Job {
 				notablePeople = people
 				log.Printf("Fetched %d notable people from Wikipedia", len(notablePeople))
 			}
+		} else if contentType != "people" {
+			log.Println("Skipping people fetching (not today's content type)")
 		}
 
 		// Select daily variety content (emo, blobby, wikihow, quote, hottub, gardening, people, events, holidays - all rotate)
@@ -247,6 +281,7 @@ func createJob(cfg *config.Config) scheduler.Job {
 			cfg.IncludeQuote,
 			cfg.IncludeHotTub,
 			cfg.IncludeGardening,
+			cfg.IncludePrinting3D,
 			cfg.IncludePeople,
 			cfg.IncludeEvents,
 			funHolidays,    // Pass holidays for rotation
@@ -261,9 +296,21 @@ func createJob(cfg *config.Config) scheduler.Job {
 			}
 		}
 
-		// Post to Slack - only show events if rotation selected them
+		// Post to Slack
 		log.Println("Posting to Slack...")
 		poster := slack.NewPoster(cfg.SlackWebhookURL)
+
+		// Post major holiday as separate message if present
+		if hasMajorHoliday {
+			log.Printf("Posting major holiday: %s", majorHoliday)
+			if err := poster.PostMajorHoliday(majorHoliday); err != nil {
+				log.Printf("Warning: failed to post major holiday: %v", err)
+			} else {
+				log.Println("Successfully posted major holiday to Slack!")
+			}
+		}
+
+		// Post regular rotation content (without major holiday)
 		var eventsToPost []llm.SelectedEvent
 		if funFact != nil && funFact.ShowEvents {
 			eventsToPost = selectedEvents
@@ -271,11 +318,11 @@ func createJob(cfg *config.Config) scheduler.Job {
 		} else {
 			log.Println("Not posting events (rotation selected different content)")
 		}
-		if err := poster.PostComplete(eventsToPost, majorHoliday, nil, funFact); err != nil {
+		if err := poster.PostComplete(eventsToPost, "", nil, funFact); err != nil {
 			return err
 		}
 
-		log.Println("Successfully posted to Slack!")
+		log.Println("Successfully posted rotation content to Slack!")
 		log.Println("=== Job execution completed ===")
 
 		return nil

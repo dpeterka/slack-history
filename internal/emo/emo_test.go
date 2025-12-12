@@ -31,7 +31,7 @@ func TestGetRandomCommentConsistency(t *testing.T) {
 }
 
 func TestGetRandomCommentByCategory(t *testing.T) {
-	categories := []string{"Work", "Life", "Relationships"}
+	categories := []string{"Work", "Life"}
 
 	for _, category := range categories {
 		comment := GetRandomCommentByCategory(category)
@@ -59,9 +59,8 @@ func TestAllCommentsHaveCategory(t *testing.T) {
 	comments := getAllComments()
 
 	validCategories := map[string]bool{
-		"Work":          true,
-		"Life":          true,
-		"Relationships": true,
+		"Work": true,
+		"Life": true,
 	}
 
 	for i, comment := range comments {

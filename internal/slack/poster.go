@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/dpeterka/history-slackbot/internal/funfacts"
 	"github.com/dpeterka/history-slackbot/internal/llm"
-	"github.com/dpeterka/history-slackbot/internal/rss"
 	"github.com/dpeterka/history-slackbot/internal/wikipedia"
 )
 
@@ -57,29 +57,6 @@ type Attachment struct {
 	Blocks []Block `json:"blocks,omitempty"`
 }
 
-// PostEvents posts selected events to Slack
-func (p *Poster) PostEvents(events []llm.SelectedEvent) error {
-	return p.PostEventsWithHolidays(events, nil)
-}
-
-// PostEventsWithHolidays posts selected events and holidays to Slack
-func (p *Poster) PostEventsWithHolidays(events []llm.SelectedEvent, holidays []rss.Holiday) error {
-	return p.PostEventsWithHolidaysAndMajor(events, holidays, "")
-}
-
-// PostEventsWithHolidaysAndMajor posts selected events, holidays, and major holiday to Slack
-func (p *Poster) PostEventsWithHolidaysAndMajor(events []llm.SelectedEvent, holidays []rss.Holiday, majorHoliday string) error {
-	// Create a funFact for holidays if provided
-	var funFact *funfacts.FunFact
-	if len(holidays) > 0 {
-		funFact = &funfacts.FunFact{
-			Type:     "holidays",
-			Holidays: holidays,
-		}
-	}
-	return p.PostComplete(events, majorHoliday, nil, funFact)
-}
-
 // PostComplete posts complete message with all content types
 func (p *Poster) PostComplete(events []llm.SelectedEvent, majorHoliday string, notablePeople []wikipedia.Person, funFact *funfacts.FunFact) error {
 	if len(events) == 0 && majorHoliday == "" && len(notablePeople) == 0 && funFact == nil {
@@ -92,6 +69,13 @@ func (p *Poster) PostComplete(events []llm.SelectedEvent, majorHoliday string, n
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)
 	}
+
+	// Log the payload size and webhook URL (partial for security)
+	webhookPreview := p.webhookURL
+	if len(webhookPreview) > 50 {
+		webhookPreview = webhookPreview[:50] + "..."
+	}
+	log.Printf("Posting to Slack webhook: %s, payload size: %d bytes", webhookPreview, len(reqBody))
 
 	req, err := http.NewRequest("POST", p.webhookURL, bytes.NewReader(reqBody))
 	if err != nil {
@@ -111,23 +95,102 @@ func (p *Poster) PostComplete(events []llm.SelectedEvent, majorHoliday string, n
 		return fmt.Errorf("failed to read response: %w", err)
 	}
 
+	// Log Slack response for debugging
+	responseText := string(body)
+	log.Printf("Slack API response: status=%d, body='%s'", resp.StatusCode, responseText)
+
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Slack API request failed with status %d: %s", resp.StatusCode, string(body))
+		log.Printf("ERROR: Slack webhook rejected the message with status %d", resp.StatusCode)
+		return fmt.Errorf("Slack API request failed with status %d: %s", resp.StatusCode, responseText)
+	}
+
+	// Check if Slack returned an error in the body
+	if responseText != "ok" {
+		log.Printf("WARNING: Slack returned unexpected response (not 'ok'): '%s'", responseText)
+		log.Printf("This may indicate the message was not posted successfully")
+	} else {
+		log.Printf("SUCCESS: Slack webhook accepted the message (returned 'ok')")
+	}
+
+	return nil
+}
+
+// PostMajorHoliday posts a simple major holiday announcement
+func (p *Poster) PostMajorHoliday(holiday string) error {
+	now := time.Now()
+	dateStr := now.Format("Monday, January 2")
+
+	blocks := []Block{
+		{
+			Type: "header",
+			Text: &TextObject{
+				Type: "plain_text",
+				Text: fmt.Sprintf("From the desk of the Grant - %s", dateStr),
+			},
+		},
+		{
+			Type: "divider",
+		},
+		{
+			Type: "section",
+			Text: &TextObject{
+				Type: "mrkdwn",
+				Text: fmt.Sprintf("*Today is %s* 🎉", holiday),
+			},
+		},
+	}
+
+	message := SlackMessage{
+		Blocks: blocks,
+	}
+
+	reqBody, err := json.Marshal(message)
+	if err != nil {
+		return fmt.Errorf("failed to marshal message: %w", err)
+	}
+
+	webhookPreview := p.webhookURL
+	if len(webhookPreview) > 50 {
+		webhookPreview = webhookPreview[:50] + "..."
+	}
+	log.Printf("Posting major holiday to Slack webhook: %s, payload size: %d bytes", webhookPreview, len(reqBody))
+
+	req, err := http.NewRequest("POST", p.webhookURL, bytes.NewReader(reqBody))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
+	}
+
+	responseText := string(body)
+	log.Printf("Slack API response for major holiday: status=%d, body='%s'", resp.StatusCode, responseText)
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("ERROR: Slack webhook rejected the major holiday message with status %d", resp.StatusCode)
+		return fmt.Errorf("Slack API request failed with status %d: %s", resp.StatusCode, responseText)
+	}
+
+	if responseText != "ok" {
+		log.Printf("WARNING: Slack returned unexpected response (not 'ok'): '%s'", responseText)
+	} else {
+		log.Printf("SUCCESS: Slack webhook accepted the major holiday message (returned 'ok')")
 	}
 
 	return nil
 }
 
 // formatMessage formats events into a Slack message with blocks
-func (p *Poster) formatMessage(events []llm.SelectedEvent) SlackMessage {
-	return p.formatMessageWithHolidays(events, nil)
-}
-
-// formatMessageWithHolidays formats events and holidays into a Slack message with blocks
-func (p *Poster) formatMessageWithHolidays(events []llm.SelectedEvent, holidays []rss.Holiday) SlackMessage {
-	return p.formatMessageWithHolidaysAndMajor(events, holidays, "")
-}
-
 // formatCompleteMessage formats all content types into a Slack message
 func (p *Poster) formatCompleteMessage(events []llm.SelectedEvent, majorHoliday string, notablePeople []wikipedia.Person, funFact *funfacts.FunFact) SlackMessage {
 	now := time.Now()
@@ -311,22 +374,8 @@ func (p *Poster) formatCompleteMessage(events []llm.SelectedEvent, majorHoliday 
 		}
 	}
 
-	// Add major holiday section if present
-	if majorHoliday != "" {
-		blocks = append(blocks, Block{
-			Type: "section",
-			Text: &TextObject{
-				Type: "mrkdwn",
-				Text: fmt.Sprintf("*Today is %s*", majorHoliday),
-			},
-		})
-
-		blocks = append(blocks, Block{
-			Type: "divider",
-		})
-	}
-
 	// Quote and holidays are now handled via funFact above
+	// Major holidays are posted as a separate message
 
 	// Add notable people section if present
 	if len(notablePeople) > 0 {
@@ -447,136 +496,6 @@ func (p *Poster) formatCompleteMessage(events []llm.SelectedEvent, majorHoliday 
 		}
 	}
 
-	// Add footer
-	blocks = append(blocks, Block{
-		Type: "context",
-		Elements: []TextObject{
-			{
-				Type: "mrkdwn",
-				Text: "_Curated by AI from today's historical events_",
-			},
-		},
-	})
-
-	return SlackMessage{
-		Blocks: blocks,
-	}
-}
-
-// formatMessageWithHolidaysAndMajor formats events, holidays, and major holiday into a Slack message with blocks
-func (p *Poster) formatMessageWithHolidaysAndMajor(events []llm.SelectedEvent, holidays []rss.Holiday, majorHoliday string) SlackMessage {
-	now := time.Now()
-	dateStr := now.Format("Monday, January 2")
-
-	// Create header block
-	blocks := []Block{
-		{
-			Type: "header",
-			Text: &TextObject{
-				Type: "plain_text",
-				Text: fmt.Sprintf("📅 On This Day in History - %s", dateStr),
-			},
-		},
-		{
-			Type: "divider",
-		},
-	}
-
-	// Add major holiday section if present
-	if majorHoliday != "" {
-		blocks = append(blocks, Block{
-			Type: "section",
-			Text: &TextObject{
-				Type: "mrkdwn",
-				Text: fmt.Sprintf("*Today is %s*", majorHoliday),
-			},
-		})
-
-		blocks = append(blocks, Block{
-			Type: "divider",
-		})
-	}
-
-	// Add holidays section if present
-	if len(holidays) > 0 {
-		blocks = append(blocks, Block{
-			Type: "section",
-			Text: &TextObject{
-				Type: "mrkdwn",
-				Text: "*🎉 Today's Fun Holidays*",
-			},
-		})
-
-		// Add each holiday with link
-		holidayText := ""
-		for i, holiday := range holidays {
-			if i > 0 {
-				holidayText += "\n"
-			}
-			// Add link if available
-			if holiday.Link != "" {
-				holidayText += fmt.Sprintf("• <%s|%s>", holiday.Link, holiday.Title)
-			} else {
-				holidayText += fmt.Sprintf("• %s", holiday.Title)
-			}
-		}
-
-		blocks = append(blocks, Block{
-			Type: "section",
-			Text: &TextObject{
-				Type: "mrkdwn",
-				Text: holidayText,
-			},
-		})
-
-		blocks = append(blocks, Block{
-			Type: "divider",
-		})
-	}
-
-	// Add each event as a section
-	for i, event := range events {
-		// Event header with year only
-		header := fmt.Sprintf("*%s*", event.Year)
-
-		// Event title - add Wikipedia link if available
-		var titleText string
-		if event.WikiURL != "" {
-			titleText = fmt.Sprintf("<%s|*%s*>", event.WikiURL, event.Title)
-		} else {
-			titleText = fmt.Sprintf("*%s*", event.Title)
-		}
-
-		// Full event block
-		eventText := fmt.Sprintf("%s\n\n%s\n\n%s", header, titleText, event.Description)
-
-		blocks = append(blocks, Block{
-			Type: "section",
-			Text: &TextObject{
-				Type: "mrkdwn",
-				Text: eventText,
-			},
-		})
-
-		// Add divider between events (but not after the last one)
-		if i < len(events)-1 {
-			blocks = append(blocks, Block{
-				Type: "divider",
-			})
-		}
-	}
-
-	// Add footer
-	blocks = append(blocks, Block{
-		Type: "context",
-		Elements: []TextObject{
-			{
-				Type: "mrkdwn",
-				Text: "_Curated by AI from today's historical events_",
-			},
-		},
-	})
-
 	return SlackMessage{
 		Blocks: blocks,
 	}
@@ -616,25 +535,4 @@ func (p *Poster) PostSimpleMessage(text string) error {
 	}
 
 	return nil
-}
-
-// FormatEventsAsText formats events as plain text (for testing or simple posts)
-func FormatEventsAsText(events []llm.SelectedEvent) string {
-	var buf strings.Builder
-
-	now := time.Now()
-	dateStr := now.Format("Monday, January 2, 2006")
-
-	buf.WriteString(fmt.Sprintf("📅 On This Day in History - %s\n\n", dateStr))
-
-	for i, event := range events {
-		buf.WriteString(fmt.Sprintf("%d. %s - %s\n", i+1, event.Year, event.Title))
-		buf.WriteString(fmt.Sprintf("   Category: %s\n", event.Category))
-		buf.WriteString(fmt.Sprintf("   %s\n", event.Description))
-		if i < len(events)-1 {
-			buf.WriteString("\n")
-		}
-	}
-
-	return buf.String()
 }

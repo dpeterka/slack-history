@@ -14,17 +14,19 @@ type Job func(ctx context.Context) error
 
 // Scheduler handles scheduling of jobs
 type Scheduler struct {
-	job      Job
-	interval time.Duration
-	runOnce  bool
+	job            Job
+	interval       time.Duration
+	runOnce        bool
+	skipInitialRun bool
 }
 
 // NewScheduler creates a new scheduler
-func NewScheduler(job Job, interval time.Duration, runOnce bool) *Scheduler {
+func NewScheduler(job Job, interval time.Duration, runOnce bool, skipInitialRun bool) *Scheduler {
 	return &Scheduler{
-		job:      job,
-		interval: interval,
-		runOnce:  runOnce,
+		job:            job,
+		interval:       interval,
+		runOnce:        runOnce,
+		skipInitialRun: skipInitialRun,
 	}
 }
 
@@ -164,6 +166,19 @@ func (s *Scheduler) StartWithCron(ctx context.Context, cronExpr string) error {
 		}
 		log.Printf("Job completed successfully")
 		return nil
+	}
+
+	// Run immediately on startup unless skipInitialRun is set
+	if !s.skipInitialRun {
+		log.Printf("Running initial job on startup...")
+		if err := s.job(ctx); err != nil {
+			log.Printf("Initial job failed: %v", err)
+			// Continue with scheduling even if initial run fails
+		} else {
+			log.Printf("Initial job completed successfully")
+		}
+	} else {
+		log.Printf("Skipping initial run (SKIP_INITIAL_RUN=true), waiting for scheduled time...")
 	}
 
 	// Create new cron scheduler with seconds precision
