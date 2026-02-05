@@ -1,0 +1,22 @@
+# Copy this file to terraform.tfvars and fill in your values
+# terraform.tfvars is gitignored for security
+
+aws_region  = "us-east-2"
+aws_profile = "pbloc"
+environment = "production"
+
+# Project configuration
+project_name = "slack-daily-history"
+
+# Schedule: 9:58 AM EST on weekdays (Monday-Friday)
+# The timezone is set in scheduler.tf to America/New_York
+schedule_expression = "cron(58 9 ? * MON-FRI *)"
+
+# Secrets - Replace with your actual values
+slack_webhook_url = "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+claude_api_key    = "sk-ant-api03-YOUR_API_KEY"
+giphy_api_key     = "YOUR_GIPHY_API_KEY"
+
+# ECS Task sizing
+task_cpu    = "256"  # 0.25 vCPU
+task_memory = "512"  # 512 MB

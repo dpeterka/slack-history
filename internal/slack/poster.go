@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dpeterka/history-slackbot/internal/birthday"
 	"github.com/dpeterka/history-slackbot/internal/funfacts"
 	"github.com/dpeterka/history-slackbot/internal/llm"
 	"github.com/dpeterka/history-slackbot/internal/wikipedia"
@@ -61,6 +62,12 @@ type Attachment struct {
 func (p *Poster) PostComplete(events []llm.SelectedEvent, majorHoliday string, notablePeople []wikipedia.Person, funFact *funfacts.FunFact) error {
 	if len(events) == 0 && majorHoliday == "" && len(notablePeople) == 0 && funFact == nil {
 		return fmt.Errorf("no content to post")
+	}
+
+	// Special case: if funFact is "events" type but we have no events, we can't post
+	if funFact != nil && funFact.Type == "events" && len(events) == 0 {
+		log.Printf("Skipping post: content type is 'events' but no events available")
+		return nil
 	}
 
 	message := p.formatCompleteMessage(events, majorHoliday, notablePeople, funFact)
@@ -532,6 +539,115 @@ func (p *Poster) PostSimpleMessage(text string) error {
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("Slack API request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// PostBirthday posts a special birthday message for the bot
+func (p *Poster) PostBirthday(birthdayMsg *birthday.BirthdayMessage) error {
+	now := time.Now()
+	dateStr := now.Format("Monday, January 2")
+
+	blocks := []Block{
+		{
+			Type: "header",
+			Text: &TextObject{
+				Type: "plain_text",
+				Text: fmt.Sprintf("From the desk of the Grant - %s", dateStr),
+			},
+		},
+		{
+			Type: "divider",
+		},
+		{
+			Type: "section",
+			Text: &TextObject{
+				Type: "mrkdwn",
+				Text: birthdayMsg.Message,
+			},
+		},
+	}
+
+	// Add Giphy GIF if available
+	if birthdayMsg.GiphyURL != "" {
+		blocks = append(blocks, Block{
+			Type: "section",
+			Text: &TextObject{
+				Type: "mrkdwn",
+				Text: fmt.Sprintf("🎁 *Birthday GIF:* <%s|Click here for celebration!>", birthdayMsg.GiphyURL),
+			},
+		})
+	}
+
+	// Add YouTube video
+	if birthdayMsg.YouTubeURL != "" {
+		blocks = append(blocks, Block{
+			Type: "section",
+			Text: &TextObject{
+				Type: "mrkdwn",
+				Text: fmt.Sprintf("🎵 *Birthday Jam:* <%s|Watch the celebration video!>", birthdayMsg.YouTubeURL),
+			},
+		})
+	}
+
+	// Add a final celebratory note
+	blocks = append(blocks, Block{
+		Type: "divider",
+	})
+	blocks = append(blocks, Block{
+		Type: "section",
+		Text: &TextObject{
+			Type: "mrkdwn",
+			Text: "_Thank you for being part of my journey. Here's to many more years of historical facts, philosophical musings, and the occasional Mr Blobby reference!_ 🎊",
+		},
+	})
+
+	message := SlackMessage{
+		Blocks: blocks,
+	}
+
+	reqBody, err := json.Marshal(message)
+	if err != nil {
+		return fmt.Errorf("failed to marshal birthday message: %w", err)
+	}
+
+	webhookPreview := p.webhookURL
+	if len(webhookPreview) > 50 {
+		webhookPreview = webhookPreview[:50] + "..."
+	}
+	log.Printf("Posting birthday message to Slack webhook: %s, payload size: %d bytes", webhookPreview, len(reqBody))
+
+	req, err := http.NewRequest("POST", p.webhookURL, bytes.NewReader(reqBody))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
+	}
+
+	responseText := string(body)
+	log.Printf("Slack API response for birthday: status=%d, body='%s'", resp.StatusCode, responseText)
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("ERROR: Slack webhook rejected the birthday message with status %d", resp.StatusCode)
+		return fmt.Errorf("Slack API request failed with status %d: %s", resp.StatusCode, responseText)
+	}
+
+	if responseText != "ok" {
+		log.Printf("WARNING: Slack returned unexpected response (not 'ok'): '%s'", responseText)
+	} else {
+		log.Printf("SUCCESS: Slack webhook accepted the birthday message (returned 'ok')")
 	}
 
 	return nil

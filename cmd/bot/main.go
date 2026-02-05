@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dpeterka/history-slackbot/internal/birthday"
 	"github.com/dpeterka/history-slackbot/internal/cache"
 	"github.com/dpeterka/history-slackbot/internal/config"
 	"github.com/dpeterka/history-slackbot/internal/funfacts"
@@ -115,6 +116,22 @@ func contains(s, substr string) bool {
 func createJob(cfg *config.Config) scheduler.Job {
 	return func(ctx context.Context) error {
 		log.Println("=== Starting job execution ===")
+
+		// Check if today is the bot's birthday!
+		if birthday.IsBotBirthday() {
+			log.Println("🎉 IT'S MY BIRTHDAY! Posting special birthday message...")
+			birthdayMsg := birthday.GetBirthdayMessage(cfg.GiphyAPIKey)
+
+			poster := slack.NewPoster(cfg.SlackWebhookURL)
+			if err := poster.PostBirthday(birthdayMsg); err != nil {
+				log.Printf("Warning: failed to post birthday message: %v", err)
+			} else {
+				log.Println("Successfully posted birthday message to Slack! 🎂")
+			}
+
+			// Continue with regular posting after birthday message
+			log.Println("Continuing with regular daily content after birthday celebration...")
+		}
 
 		// Check if today is a weekend (skip posting on weekends)
 		now := time.Now()

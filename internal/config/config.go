@@ -16,6 +16,9 @@ type Config struct {
 	ClaudeAPIKey string
 	ClaudeModel  string
 
+	// Giphy API configuration
+	GiphyAPIKey string
+
 	// RSS feed URLs
 	RSSFeedURLs []string
 
@@ -54,6 +57,7 @@ func Load() (*Config, error) {
 		SlackWebhookURL:      os.Getenv("SLACK_WEBHOOK_URL"),
 		ClaudeAPIKey:         os.Getenv("CLAUDE_API_KEY"),
 		ClaudeModel:          getEnvOrDefault("CLAUDE_MODEL", "claude-sonnet-4-5"),
+		GiphyAPIKey:          os.Getenv("GIPHY_API_KEY"),
 		ScheduleCron:         getEnvOrDefault("SCHEDULE_CRON", "0 9 * * *"), // Default: 9 AM daily
 		RunOnce:              getEnvBool("RUN_ONCE", false),
 		SkipInitialRun:       getEnvBool("SKIP_INITIAL_RUN", false),
