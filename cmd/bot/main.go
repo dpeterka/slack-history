@@ -151,6 +151,7 @@ func createJob(cfg *config.Config) scheduler.Job {
 			cfg.IncludeEmoComment,
 			cfg.IncludeBlobbyFact,
 			cfg.IncludeWikiHow,
+			cfg.IncludeWikiHowQuizzes,
 			cfg.IncludeQuote,
 			cfg.IncludeHotTub,
 			cfg.IncludeGardening,
@@ -295,14 +296,15 @@ func createJob(cfg *config.Config) scheduler.Job {
 			cfg.IncludeEmoComment,
 			cfg.IncludeBlobbyFact,
 			cfg.IncludeWikiHow,
+			cfg.IncludeWikiHowQuizzes,
 			cfg.IncludeQuote,
 			cfg.IncludeHotTub,
 			cfg.IncludeGardening,
 			cfg.IncludePrinting3D,
 			cfg.IncludePeople,
 			cfg.IncludeEvents,
-			funHolidays,    // Pass holidays for rotation
-			notablePeople,  // Pass people for rotation
+			funHolidays,   // Pass holidays for rotation
+			notablePeople, // Pass people for rotation
 			cfg.MaxPeople,
 			cfg.TestDateSeed,
 		)

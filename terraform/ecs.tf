@@ -84,11 +84,23 @@ resource "aws_ecs_task_definition" "slack_history_bot" {
           value = "true"
         },
         {
+          name  = "INCLUDE_WIKIHOW"
+          value = "true"
+        },
+        {
+          name  = "INCLUDE_WIKIHOW_QUIZZES"
+          value = "true"
+        },
+        {
           name  = "INCLUDE_HOTTUB"
           value = "true"
         },
         {
           name  = "INCLUDE_GARDENING"
+          value = "true"
+        },
+        {
+          name  = "INCLUDE_PRINTING3D"
           value = "true"
         },
         {

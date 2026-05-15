@@ -6,25 +6,27 @@ import (
 
 func TestGetRandomFunFact(t *testing.T) {
 	testCases := []struct {
-		name           string
-		includeEmo     bool
-		includeBlobby  bool
-		includeWikiHow bool
-		includeQuote   bool
-		expectNil      bool
+		name                  string
+		includeEmo            bool
+		includeBlobby         bool
+		includeWikiHow        bool
+		includeWikiHowQuizzes bool
+		includeQuote          bool
+		expectNil             bool
 	}{
-		{"All enabled", true, true, true, true, false},
-		{"Emo, Blobby, WikiHow", true, true, true, false, false},
-		{"Only emo", true, false, false, false, false},
-		{"Only blobby", false, true, false, false, false},
-		{"Only wikihow", false, false, true, false, false},
-		{"Only quote", false, false, false, true, false},
-		{"None enabled", false, false, false, false, true},
+		{"All enabled", true, true, true, true, true, false},
+		{"Emo, Blobby, WikiHow", true, true, true, false, false, false},
+		{"Only emo", true, false, false, false, false, false},
+		{"Only blobby", false, true, false, false, false, false},
+		{"Only wikihow", false, false, true, false, false, false},
+		{"Only wikihow_quizzes", false, false, false, true, false, false},
+		{"Only quote", false, false, false, false, true, false},
+		{"None enabled", false, false, false, false, false, true},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			fact := GetRandomFunFact(tc.includeEmo, tc.includeBlobby, tc.includeWikiHow, tc.includeQuote)
+			fact := GetRandomFunFact(tc.includeEmo, tc.includeBlobby, tc.includeWikiHow, tc.includeWikiHowQuizzes, tc.includeQuote, false, false, false, false, false)
 
 			if tc.expectNil {
 				if fact != nil {
@@ -51,8 +53,8 @@ func TestGetRandomFunFact(t *testing.T) {
 
 func TestGetRandomFunFactConsistency(t *testing.T) {
 	// Should return same fact for same day
-	fact1 := GetRandomFunFact(true, true, true, false)
-	fact2 := GetRandomFunFact(true, true, true, false)
+	fact1 := GetRandomFunFact(true, true, true, false, false, false, false, false, false, false)
+	fact2 := GetRandomFunFact(true, true, true, false, false, false, false, false, false, false)
 
 	if fact1 == nil || fact2 == nil {
 		t.Fatal("Expected non-nil facts")
@@ -75,6 +77,7 @@ func TestGetDisplayTitle(t *testing.T) {
 		{"emo", "💭 Today's Thought"},
 		{"blobby", "🎀 Mr Blobby Fact of the Day"},
 		{"wikihow", "📚 Helpful WikiHow Article"},
+		{"wikihow_quizzes", "🧠 WikiHow Quiz of the Day"},
 		{"unknown", "💡 Fun Fact"},
 	}
 

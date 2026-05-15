@@ -26,9 +26,9 @@ type Config struct {
 	HolidayFeedURL string
 
 	// Scheduler configuration
-	ScheduleCron     string // Cron expression for scheduling
-	RunOnce          bool   // Run once and exit (for testing)
-	SkipInitialRun   bool   // Skip running immediately on startup, only use schedule
+	ScheduleCron   string // Cron expression for scheduling
+	RunOnce        bool   // Run once and exit (for testing)
+	SkipInitialRun bool   // Skip running immediately on startup, only use schedule
 
 	// LLM prompt configuration
 	MaxEvents            int // Maximum number of events to select
@@ -36,46 +36,48 @@ type Config struct {
 	EventSelectionPrompt string
 
 	// New feature flags
-	IncludeQuote         bool   // Include quote of the day
-	IncludePeople        bool   // Include notable births/deaths
-	IncludeEmoComment    bool   // Include emo/philosophical comment
-	IncludeBlobbyFact    bool   // Include Mr Blobby fact
-	IncludeWikiHow       bool   // Include WikiHow articles
-	IncludeHotTub        bool   // Include hot tub care tips
-	IncludeGardening     bool   // Include gardening tips
-	IncludePrinting3D    bool   // Include 3D printing tips
-	IncludeEvents        bool   // Include historical events
-	MaxPeople            int    // Maximum number of people to display
-	CacheDir             string // Directory for event history cache
-	ContentRotationWeeks int    // Number of weeks before repeating content
-	TestDateSeed         int    // Override date seed for testing (0 = use current date)
+	IncludeQuote          bool   // Include quote of the day
+	IncludePeople         bool   // Include notable births/deaths
+	IncludeEmoComment     bool   // Include emo/philosophical comment
+	IncludeBlobbyFact     bool   // Include Mr Blobby fact
+	IncludeWikiHow        bool   // Include WikiHow articles
+	IncludeWikiHowQuizzes bool   // Include WikiHow quizzes
+	IncludeHotTub         bool   // Include hot tub care tips
+	IncludeGardening      bool   // Include gardening tips
+	IncludePrinting3D     bool   // Include 3D printing tips
+	IncludeEvents         bool   // Include historical events
+	MaxPeople             int    // Maximum number of people to display
+	CacheDir              string // Directory for event history cache
+	ContentRotationWeeks  int    // Number of weeks before repeating content
+	TestDateSeed          int    // Override date seed for testing (0 = use current date)
 }
 
 // Load loads configuration from environment variables
 func Load() (*Config, error) {
 	cfg := &Config{
-		SlackWebhookURL:      os.Getenv("SLACK_WEBHOOK_URL"),
-		ClaudeAPIKey:         os.Getenv("CLAUDE_API_KEY"),
-		ClaudeModel:          getEnvOrDefault("CLAUDE_MODEL", "claude-sonnet-4-5"),
-		GiphyAPIKey:          os.Getenv("GIPHY_API_KEY"),
-		ScheduleCron:         getEnvOrDefault("SCHEDULE_CRON", "0 9 * * *"), // Default: 9 AM daily
-		RunOnce:              getEnvBool("RUN_ONCE", false),
-		SkipInitialRun:       getEnvBool("SKIP_INITIAL_RUN", false),
-		MaxEvents:            getEnvInt("MAX_EVENTS", 1),
-		MaxHolidays:          getEnvInt("MAX_HOLIDAYS", 2),
-		IncludeQuote:         getEnvBool("INCLUDE_QUOTE", true),
-		IncludePeople:        getEnvBool("INCLUDE_PEOPLE", true),
-		IncludeEmoComment:    getEnvBool("INCLUDE_EMO_COMMENT", true),
-		IncludeBlobbyFact:    getEnvBool("INCLUDE_BLOBBY_FACT", true),
-		IncludeWikiHow:       getEnvBool("INCLUDE_WIKIHOW", true),
-		IncludeHotTub:        getEnvBool("INCLUDE_HOTTUB", true),
-		IncludeGardening:     getEnvBool("INCLUDE_GARDENING", true),
-		IncludePrinting3D:    getEnvBool("INCLUDE_PRINTING3D", true),
-		IncludeEvents:        getEnvBool("INCLUDE_EVENTS", true),
-		MaxPeople:            getEnvInt("MAX_PEOPLE", 2),
-		CacheDir:             getEnvOrDefault("CACHE_DIR", ".cache"),
-		ContentRotationWeeks: getEnvInt("CONTENT_ROTATION_WEEKS", 6),
-		TestDateSeed:         getEnvInt("TEST_DATE_SEED", 0),
+		SlackWebhookURL:       os.Getenv("SLACK_WEBHOOK_URL"),
+		ClaudeAPIKey:          os.Getenv("CLAUDE_API_KEY"),
+		ClaudeModel:           getEnvOrDefault("CLAUDE_MODEL", "claude-sonnet-4-5"),
+		GiphyAPIKey:           os.Getenv("GIPHY_API_KEY"),
+		ScheduleCron:          getEnvOrDefault("SCHEDULE_CRON", "0 9 * * *"), // Default: 9 AM daily
+		RunOnce:               getEnvBool("RUN_ONCE", false),
+		SkipInitialRun:        getEnvBool("SKIP_INITIAL_RUN", false),
+		MaxEvents:             getEnvInt("MAX_EVENTS", 1),
+		MaxHolidays:           getEnvInt("MAX_HOLIDAYS", 2),
+		IncludeQuote:          getEnvBool("INCLUDE_QUOTE", true),
+		IncludePeople:         getEnvBool("INCLUDE_PEOPLE", true),
+		IncludeEmoComment:     getEnvBool("INCLUDE_EMO_COMMENT", true),
+		IncludeBlobbyFact:     getEnvBool("INCLUDE_BLOBBY_FACT", true),
+		IncludeWikiHow:        getEnvBool("INCLUDE_WIKIHOW", true),
+		IncludeWikiHowQuizzes: getEnvBool("INCLUDE_WIKIHOW_QUIZZES", true),
+		IncludeHotTub:         getEnvBool("INCLUDE_HOTTUB", true),
+		IncludeGardening:      getEnvBool("INCLUDE_GARDENING", true),
+		IncludePrinting3D:     getEnvBool("INCLUDE_PRINTING3D", true),
+		IncludeEvents:         getEnvBool("INCLUDE_EVENTS", true),
+		MaxPeople:             getEnvInt("MAX_PEOPLE", 2),
+		CacheDir:              getEnvOrDefault("CACHE_DIR", ".cache"),
+		ContentRotationWeeks:  getEnvInt("CONTENT_ROTATION_WEEKS", 6),
+		TestDateSeed:          getEnvInt("TEST_DATE_SEED", 0),
 	}
 
 	// RSS feed URLs - support multiple feeds (comma-separated)

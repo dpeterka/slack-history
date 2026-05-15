@@ -11,7 +11,7 @@ func TestNewScheduler(t *testing.T) {
 	job := func(ctx context.Context) error { return nil }
 	interval := 1 * time.Hour
 
-	scheduler := NewScheduler(job, interval, false)
+	scheduler := NewScheduler(job, interval, false, false)
 
 	if scheduler == nil {
 		t.Error("NewScheduler() returned nil")
@@ -31,7 +31,7 @@ func TestSchedulerRunOnce(t *testing.T) {
 		return nil
 	}
 
-	scheduler := NewScheduler(job, 0, true)
+	scheduler := NewScheduler(job, 0, true, false)
 	ctx := context.Background()
 
 	err := scheduler.Start(ctx)
@@ -49,7 +49,7 @@ func TestSchedulerRunOnceWithError(t *testing.T) {
 		return expectedErr
 	}
 
-	scheduler := NewScheduler(job, 0, true)
+	scheduler := NewScheduler(job, 0, true, false)
 	ctx := context.Background()
 
 	err := scheduler.Start(ctx)

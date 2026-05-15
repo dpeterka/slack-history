@@ -19,9 +19,8 @@ fi
 
 # Get AWS account ID
 echo -e "\n${YELLOW}Getting AWS account information...${NC}"
-AWS_PROFILE="pbloc"
 AWS_REGION="us-east-2"
-AWS_ACCOUNT_ID=$(aws sts get-caller-identity --profile $AWS_PROFILE --query Account --output text)
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 echo "AWS Account ID: $AWS_ACCOUNT_ID"
 echo "AWS Region: $AWS_REGION"
 
@@ -38,7 +37,7 @@ docker tag slack-daily-history:latest $ECR_REPO:latest
 
 # Login to ECR
 echo -e "\n${YELLOW}Logging in to ECR...${NC}"
-aws ecr get-login-password --region $AWS_REGION --profile $AWS_PROFILE | \
+aws ecr get-login-password --region $AWS_REGION | \
     docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
 # Push to ECR
@@ -54,4 +53,4 @@ terraform apply -auto-approve
 echo -e "\n${GREEN}Deployment complete!${NC}"
 echo -e "Image: ${ECR_REPO}:latest"
 echo -e "\nTo view logs:"
-echo -e "  aws logs tail /ecs/slack-daily-history --follow --profile $AWS_PROFILE"
+echo -e "  aws logs tail /ecs/slack-daily-history --follow"
