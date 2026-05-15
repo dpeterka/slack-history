@@ -45,6 +45,8 @@ type Config struct {
 	IncludeHotTub         bool   // Include hot tub care tips
 	IncludeGardening      bool   // Include gardening tips
 	IncludePrinting3D     bool   // Include 3D printing tips
+	IncludeCamping        bool   // Include camping tips
+	IncludeJoke           bool   // Include daily joke (rendered bare, no title)
 	IncludeEvents         bool   // Include historical events
 	MaxPeople             int    // Maximum number of people to display
 	CacheDir              string // Directory for event history cache
@@ -73,6 +75,8 @@ func Load() (*Config, error) {
 		IncludeHotTub:         getEnvBool("INCLUDE_HOTTUB", true),
 		IncludeGardening:      getEnvBool("INCLUDE_GARDENING", true),
 		IncludePrinting3D:     getEnvBool("INCLUDE_PRINTING3D", true),
+		IncludeCamping:        getEnvBool("INCLUDE_CAMPING", true),
+		IncludeJoke:           getEnvBool("INCLUDE_JOKE", true),
 		IncludeEvents:         getEnvBool("INCLUDE_EVENTS", true),
 		MaxPeople:             getEnvInt("MAX_PEOPLE", 2),
 		CacheDir:              getEnvOrDefault("CACHE_DIR", ".cache"),

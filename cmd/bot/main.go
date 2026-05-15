@@ -156,6 +156,8 @@ func createJob(cfg *config.Config) scheduler.Job {
 			cfg.IncludeHotTub,
 			cfg.IncludeGardening,
 			cfg.IncludePrinting3D,
+			cfg.IncludeCamping,
+			cfg.IncludeJoke,
 			cfg.IncludePeople,
 			cfg.IncludeEvents,
 			cfg.HolidayFeedURL != "", // Include holidays if URL is configured
@@ -301,6 +303,8 @@ func createJob(cfg *config.Config) scheduler.Job {
 			cfg.IncludeHotTub,
 			cfg.IncludeGardening,
 			cfg.IncludePrinting3D,
+			cfg.IncludeCamping,
+			cfg.IncludeJoke,
 			cfg.IncludePeople,
 			cfg.IncludeEvents,
 			funHolidays,   // Pass holidays for rotation

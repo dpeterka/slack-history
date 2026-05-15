@@ -26,7 +26,7 @@ func TestGetRandomFunFact(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			fact := GetRandomFunFact(tc.includeEmo, tc.includeBlobby, tc.includeWikiHow, tc.includeWikiHowQuizzes, tc.includeQuote, false, false, false, false, false)
+			fact := GetRandomFunFact(tc.includeEmo, tc.includeBlobby, tc.includeWikiHow, tc.includeWikiHowQuizzes, tc.includeQuote, false, false, false, false, false, false, false)
 
 			if tc.expectNil {
 				if fact != nil {
@@ -53,8 +53,8 @@ func TestGetRandomFunFact(t *testing.T) {
 
 func TestGetRandomFunFactConsistency(t *testing.T) {
 	// Should return same fact for same day
-	fact1 := GetRandomFunFact(true, true, true, false, false, false, false, false, false, false)
-	fact2 := GetRandomFunFact(true, true, true, false, false, false, false, false, false, false)
+	fact1 := GetRandomFunFact(true, true, true, false, false, false, false, false, false, false, false, false)
+	fact2 := GetRandomFunFact(true, true, true, false, false, false, false, false, false, false, false, false)
 
 	if fact1 == nil || fact2 == nil {
 		t.Fatal("Expected non-nil facts")
@@ -78,6 +78,8 @@ func TestGetDisplayTitle(t *testing.T) {
 		{"blobby", "🎀 Mr Blobby Fact of the Day"},
 		{"wikihow", "📚 Helpful WikiHow Article"},
 		{"wikihow_quizzes", "🧠 WikiHow Quiz of the Day"},
+		{"camping", "🏕️ Camping Tip of the Day"},
+		{"joke", "💡 Fun Fact"},
 		{"unknown", "💡 Fun Fact"},
 	}
 

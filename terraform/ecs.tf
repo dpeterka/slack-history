@@ -104,6 +104,14 @@ resource "aws_ecs_task_definition" "slack_history_bot" {
           value = "true"
         },
         {
+          name  = "INCLUDE_CAMPING"
+          value = "true"
+        },
+        {
+          name  = "INCLUDE_JOKE"
+          value = "true"
+        },
+        {
           name  = "INCLUDE_EVENTS"
           value = "true"
         },

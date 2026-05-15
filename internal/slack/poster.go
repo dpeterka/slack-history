@@ -218,8 +218,9 @@ func (p *Poster) formatCompleteMessage(events []llm.SelectedEvent, majorHoliday 
 	}
 
 	// Add fun fact section if present (emo, blobby, wikihow, quote, holidays, people)
-	if funFact != nil && funFact.Type != "events" && funFact.Type != "people" {
-		// Add title for the fact type (skip for events and people as they have their own section titles)
+	if funFact != nil && funFact.Type != "events" && funFact.Type != "people" && funFact.Type != "joke" {
+		// Add title for the fact type (skip for events and people as they have their own section titles;
+		// jokes render bare without any title for non-sequitur impact)
 		blocks = append(blocks, Block{
 			Type: "section",
 			Text: &TextObject{
