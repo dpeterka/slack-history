@@ -1,7 +1,7 @@
 package blobby
 
 import (
-	"math/rand"
+	"github.com/dpeterka/history-slackbot/internal/rotation"
 	"time"
 )
 
@@ -26,9 +26,8 @@ func GetRandomFactWithSeed(seed int) Fact {
 		now := time.Now()
 		seed = now.Year()*10000 + int(now.Month())*100 + now.Day()
 	}
-	r := rand.New(rand.NewSource(int64(seed)))
 
-	return facts[r.Intn(len(facts))]
+	return facts[rotation.PickIndex(len(facts), seed)]
 }
 
 // GetRandomFactByCategory returns a random fact from a specific category
@@ -49,9 +48,8 @@ func GetRandomFactByCategory(category string) Fact {
 	// Use current date for seed
 	now := time.Now()
 	seed := now.Year()*10000 + int(now.Month())*100 + now.Day()
-	r := rand.New(rand.NewSource(int64(seed)))
 
-	return filtered[r.Intn(len(filtered))]
+	return filtered[rotation.PickIndex(len(filtered), seed)]
 }
 
 // getAllFacts returns all Mr Blobby facts
@@ -257,6 +255,106 @@ func getAllFacts() []Fact {
 		{
 			Text:     "During a 2018 interview, Edmonds revealed that Mr Blobby was meant to appear for just three episodes but became 'a monster we couldn't control.'",
 			Category: "Creator",
+		},
+		{
+			Text:     "Mr Blobby's 1993 single knocked Take That's 'Babe' off the UK #1 spot just in time for Christmas, then reclaimed it after briefly losing it — one of the pettiest chart battles in British history.",
+			Category: "Music",
+		},
+		{
+			Text:     "The 'Mr Blobby' single sold over 700,000 copies. That's 700,000 separate human decisions.",
+			Category: "Music",
+		},
+		{
+			Text:     "Actor Barry Killerby performed as Mr Blobby for most of the character's run, a role he reportedly approached with the seriousness of classical theatre.",
+			Category: "Origins",
+		},
+		{
+			Text:     "Mr Blobby is pink with yellow spots, has permanently startled eyes, and wears a green bow tie — a design committee decision that no one has ever taken responsibility for.",
+			Category: "Design",
+		},
+		{
+			Text:     "The Morecambe 'Crinkley Bottom' park closed after just 13 weeks, triggering a council scandal known locally as 'Blobbygate' and an official inquiry that cost taxpayers £2.5 million.",
+			Category: "Theme Park",
+		},
+		{
+			Text:     "Blobbygate remains one of the few British political scandals named after a children's TV character, a distinction historians have chosen not to celebrate.",
+			Category: "Controversies",
+		},
+		{
+			Text:     "Mr Blobby's house in Blobbyland, 'Dunblobbin,' was a real cottage with melted-looking pink architecture. Urban explorers still make pilgrimages to its remains.",
+			Category: "Theme Park",
+		},
+		{
+			Text:     "In 2023, an original Mr Blobby costume listed on eBay attracted a winning bid of £62,000 before the buyer got cold feet — proving even Blobby's collectors experience sudden clarity.",
+			Category: "Modern",
+		},
+		{
+			Text:     "Mr Blobby turned 30 in 2022 and marked the occasion with a social media campaign that several outlets described as 'a threat.'",
+			Category: "Modern",
+		},
+		{
+			Text:     "Mr Blobby once appeared on live TV wrestling Noel Edmonds to the floor, unscripted, because the performer inside couldn't see where he was going.",
+			Category: "TV",
+		},
+		{
+			Text:     "The Mr Blobby costume's eyes are fixed in an expression of eternal surprise, which performers say accurately reflects the experience of being inside it.",
+			Category: "Design",
+		},
+		{
+			Text:     "Mr Blobby merchandise included duvet covers, meaning thousands of British children voluntarily slept under his gaze.",
+			Category: "Commercial",
+		},
+		{
+			Text:     "A Mr Blobby balloon once escaped its handlers at a 1994 parade and had to be retrieved from a rooftop, in what witnesses describe as the most on-brand moment of his career.",
+			Category: "Controversies",
+		},
+		{
+			Text:     "Mr Blobby's catchphrase 'Blobby Blobby Blobby' has been analyzed by linguists as a complete, self-contained language with exactly one morpheme.",
+			Category: "Academic",
+		},
+		{
+			Text:     "BBC archives reportedly contain hours of unaired Mr Blobby footage deemed 'too chaotic' for broadcast, which given what did air is a genuinely frightening thought.",
+			Category: "TV",
+		},
+		{
+			Text:     "Mr Blobby was nearly given a spin-off cartoon series in 1995. The pilot was never released, and animators involved have declined to discuss it.",
+			Category: "Almost Happened",
+		},
+		{
+			Text:     "A Mr Blobby-themed restaurant was proposed for London's West End in 1994 at the peak of Blobby-mania. Investors withdrew when the mania ended, roughly eleven minutes later.",
+			Category: "Almost Happened",
+		},
+		{
+			Text:     "Mr Blobby has been played by multiple performers over the decades, all of whom describe the experience with the same thousand-yard stare.",
+			Category: "Legacy",
+		},
+		{
+			Text:     "In 2021, a fan-made horror short film reimagining Mr Blobby as a slasher villain went viral, requiring almost no changes to the source material.",
+			Category: "Modern",
+		},
+		{
+			Text:     "Mr Blobby's chart success meant he technically outsold Nirvana in the UK singles market in December 1993, a sentence that has ended arguments and friendships.",
+			Category: "Music",
+		},
+		{
+			Text:     "The original Blobbyland site in Somerset was finally demolished in 2024, and locals reported the bulldozers 'hesitated.'",
+			Category: "Theme Park",
+		},
+		{
+			Text:     "Mr Blobby once presented a segment on breakfast television that had to be cut short when he destroyed the weather map, delaying the forecast for the entire nation.",
+			Category: "TV",
+		},
+		{
+			Text:     "Academics have noted that Mr Blobby predates and arguably perfected the 'chaos agent' archetype later seen in internet culture — he was posting cursed content before the internet could.",
+			Category: "Academic",
+		},
+		{
+			Text:     "A wax figure of Mr Blobby was proposed for Madame Tussauds in 1994 but rejected on the grounds that he is 'already essentially a wax figure come to life.'",
+			Category: "Almost Happened",
+		},
+		{
+			Text:     "Despite everything — the injuries, the scandals, the £2.5 million inquiry — Mr Blobby remains beloved, which says more about Britain than any history book ever could.",
+			Category: "Legacy",
 		},
 	}
 }

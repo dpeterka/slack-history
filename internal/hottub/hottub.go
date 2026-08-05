@@ -1,7 +1,7 @@
 package hottub
 
 import (
-	"math/rand"
+	"github.com/dpeterka/history-slackbot/internal/rotation"
 	"time"
 )
 
@@ -89,9 +89,8 @@ func GetRandomTipWithSeed(seed int) Tip {
 		now := time.Now()
 		seed = now.Year()*10000 + int(now.Month())*100 + now.Day()
 	}
-	r := rand.New(rand.NewSource(int64(seed)))
 
-	return tips[r.Intn(len(tips))]
+	return tips[rotation.PickIndex(len(tips), seed)]
 }
 
 // GetRandomTipByCategory returns a random tip from a specific category
@@ -112,9 +111,8 @@ func GetRandomTipByCategory(category string) Tip {
 	// Use current date for seed
 	now := time.Now()
 	seed := now.Year()*10000 + int(now.Month())*100 + now.Day()
-	r := rand.New(rand.NewSource(int64(seed)))
 
-	return filtered[r.Intn(len(filtered))]
+	return filtered[rotation.PickIndex(len(filtered), seed)]
 }
 
 // getAllTips returns all tips (used internally)

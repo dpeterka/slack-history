@@ -112,6 +112,14 @@ resource "aws_ecs_task_definition" "slack_history_bot" {
           value = "true"
         },
         {
+          name  = "INCLUDE_FOOD_TAKES"
+          value = "true"
+        },
+        {
+          name  = "AI_GENERATED_CONTENT"
+          value = "true"
+        },
+        {
           name  = "INCLUDE_EVENTS"
           value = "true"
         },

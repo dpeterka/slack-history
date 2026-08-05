@@ -1,7 +1,7 @@
 package wikihow
 
 import (
-	"math/rand"
+	"github.com/dpeterka/history-slackbot/internal/rotation"
 	"time"
 )
 
@@ -26,9 +26,8 @@ func GetRandomArticleWithSeed(seed int) Article {
 		now := time.Now()
 		seed = now.Year()*10000 + int(now.Month())*100 + now.Day()
 	}
-	r := rand.New(rand.NewSource(int64(seed)))
 
-	return articles[r.Intn(len(articles))]
+	return articles[rotation.PickIndex(len(articles), seed)]
 }
 
 func getAllArticles() []Article {

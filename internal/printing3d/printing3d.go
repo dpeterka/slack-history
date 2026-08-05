@@ -1,7 +1,7 @@
 package printing3d
 
 import (
-	"math/rand"
+	"github.com/dpeterka/history-slackbot/internal/rotation"
 	"time"
 )
 
@@ -72,16 +72,45 @@ var tips = []Tip{
 	{Text: "Upgrade your printer only after you've mastered it stock. Upgrades won't fix poor technique or lazy bed leveling.", Category: "General"},
 	{Text: "Print practical things or fun things. Printing calibration cubes forever means you own an expensive cube factory.", Category: "General"},
 	{Text: "Standard nozzle is 0.4mm. Bigger (0.6mm) prints faster but loses detail. Smaller (0.2mm) adds detail but takes forever. Choose based on your part.", Category: "General"},
+
+	// 2026 refresh
+	{Text: "Calibrate your e-steps before touching anything else. If your extruder pushes 95mm when asked for 100, every other setting is a lie.", Category: "Calibration"},
+	{Text: "A $20 pair of calipers will improve your prints more than a $200 upgrade. Measure your filament, measure your parts, trust nothing.", Category: "Calibration"},
+	{Text: "First layer too squished on one side only? Your gantry is racked. Level the X-axis against the frame with the power off.", Category: "Troubleshooting"},
+	{Text: "Hairspray, glue stick, or textured PEI — pick one adhesion method and learn it. Switching daily means you never learn what actually failed.", Category: "Bed Adhesion"},
+	{Text: "Dry your filament even if it's 'new.' It sat in a warehouse, on a boat, and in a delivery van. The vacuum seal is a suggestion.", Category: "Filament Storage"},
+	{Text: "Wet PETG sounds like bacon frying as it prints. If your printer sounds delicious, your filament needs drying.", Category: "Filament Storage"},
+	{Text: "Print your spool holder upgrades in PETG, not PLA. PLA creeps under constant load and your beautiful bracket will slowly sag into modern art.", Category: "Filament"},
+	{Text: "Silk PLA looks gorgeous and prints like it hates you. Slow it down, hotten it up, and never use it for functional parts — the layers barely bond.", Category: "Filament"},
+	{Text: "Gyroid infill is stronger in all directions, looks cool through translucent walls, and sounds like a UFO landing. There is no downside.", Category: "Infill"},
+	{Text: "Set your infill to 100% exactly once, print a chess piece, feel how heavy it is, then never do it again.", Category: "Infill"},
+	{Text: "Seams go in corners. A seam on a flat wall is a scar; a seam in a corner is invisible. Tell your slicer where to hide the evidence.", Category: "Slicing"},
+	{Text: "Variable layer height is free quality: fine layers on curves, thick layers on straight walls. Two clicks in the slicer, looks twice as good.", Category: "Slicing"},
+	{Text: "Your slicer's 'estimated time' is a work of speculative fiction. Add 15% and you'll be pleasantly surprised instead of bitterly disappointed.", Category: "Slicing"},
+	{Text: "Fuzzy skin mode hides layer lines completely and makes parts grippy. It's the witness protection program for mediocre print quality.", Category: "Slicing"},
+	{Text: "Print small parts in pairs even if you need one. The second copy gives each layer time to cool, and you get a spare for when you drop the first one.", Category: "Speed"},
+	{Text: "Speed is free until it isn't. Ringing, ghosting, and skipped steps all arrive at the same party. Find your printer's limit, then back off 20%.", Category: "Speed"},
+	{Text: "A clogged nozzle rarely announces itself. Watch your first layer: thin, inconsistent lines mean a partial clog is already taxing your extrusion.", Category: "Troubleshooting"},
+	{Text: "Heat creep kills mid-print. If long prints fail at hour three but short ones succeed, your hotend fan is losing the war. Check it, clean it, replace it.", Category: "Troubleshooting"},
+	{Text: "Spaghetti detection is cheaper than filament. A $30 camera watching your print saves you from waking up to a plastic bird's nest.", Category: "Troubleshooting"},
+	{Text: "PLA parts left in a hot car become abstract sculpture. If it lives outside or in a vehicle, print it in PETG, ASA, or accept the consequences.", Category: "Filament"},
+	{Text: "Threaded inserts turn a hobby print into hardware. A soldering iron, a brass insert, and suddenly your part survives being screwed together more than once.", Category: "Design"},
+	{Text: "Design in tolerances: holes print smaller than modeled, pegs print bigger. 0.2mm clearance for tight fits, 0.4mm for parts that must slide.", Category: "Design"},
+	{Text: "Split tall thin parts and print them lying down. Strength comes from printing along the stress line, not from hoping vertical layers hold.", Category: "Design"},
+	{Text: "Keep a print graveyard box. Failed prints are calibration data, test material for paint and glue, and a humbling reminder every time you open the drawer.", Category: "General"},
+	{Text: "The best printer upgrade is a notebook. Write down what you changed and why, or you'll fix the same problem four times a year forever.", Category: "General"},
 }
 
-// GetRandomTip returns a random 3D printing tip
+// GetRandomTip returns today's 3D printing tip
 func GetRandomTip() Tip {
-	rand.Seed(time.Now().UnixNano())
-	return tips[rand.Intn(len(tips))]
+	return GetRandomTipWithSeed(0)
 }
 
-// GetRandomTipWithSeed returns a random 3D printing tip using a specific seed
+// GetRandomTipWithSeed returns a 3D printing tip using a specific seed
 func GetRandomTipWithSeed(seed int) Tip {
-	rand.Seed(int64(seed))
-	return tips[rand.Intn(len(tips))]
+	if seed == 0 {
+		now := time.Now()
+		seed = now.Year()*10000 + int(now.Month())*100 + now.Day()
+	}
+	return tips[rotation.PickIndex(len(tips), seed)]
 }

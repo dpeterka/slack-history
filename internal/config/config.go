@@ -47,11 +47,13 @@ type Config struct {
 	IncludePrinting3D     bool   // Include 3D printing tips
 	IncludeCamping        bool   // Include camping tips
 	IncludeJoke           bool   // Include daily joke (rendered bare, no title)
+	IncludeFoodTakes      bool   // Include unhinged food take
 	IncludeEvents         bool   // Include historical events
 	MaxPeople             int    // Maximum number of people to display
 	CacheDir              string // Directory for event history cache
 	ContentRotationWeeks  int    // Number of weeks before repeating content
 	TestDateSeed          int    // Override date seed for testing (0 = use current date)
+	AIGeneratedContent    bool   // Generate the day's text content fresh daily (falls back to static packs)
 }
 
 // Load loads configuration from environment variables
@@ -77,11 +79,13 @@ func Load() (*Config, error) {
 		IncludePrinting3D:     getEnvBool("INCLUDE_PRINTING3D", true),
 		IncludeCamping:        getEnvBool("INCLUDE_CAMPING", true),
 		IncludeJoke:           getEnvBool("INCLUDE_JOKE", true),
+		IncludeFoodTakes:      getEnvBool("INCLUDE_FOOD_TAKES", true),
 		IncludeEvents:         getEnvBool("INCLUDE_EVENTS", true),
 		MaxPeople:             getEnvInt("MAX_PEOPLE", 2),
 		CacheDir:              getEnvOrDefault("CACHE_DIR", ".cache"),
 		ContentRotationWeeks:  getEnvInt("CONTENT_ROTATION_WEEKS", 6),
 		TestDateSeed:          getEnvInt("TEST_DATE_SEED", 0),
+		AIGeneratedContent:    getEnvBool("AI_GENERATED_CONTENT", false),
 	}
 
 	// RSS feed URLs - support multiple feeds (comma-separated)

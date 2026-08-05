@@ -158,6 +158,7 @@ func createJob(cfg *config.Config) scheduler.Job {
 			cfg.IncludePrinting3D,
 			cfg.IncludeCamping,
 			cfg.IncludeJoke,
+			cfg.IncludeFoodTakes,
 			cfg.IncludePeople,
 			cfg.IncludeEvents,
 			cfg.HolidayFeedURL != "", // Include holidays if URL is configured
@@ -305,10 +306,12 @@ func createJob(cfg *config.Config) scheduler.Job {
 			cfg.IncludePrinting3D,
 			cfg.IncludeCamping,
 			cfg.IncludeJoke,
+			cfg.IncludeFoodTakes,
 			cfg.IncludePeople,
 			cfg.IncludeEvents,
-			funHolidays,   // Pass holidays for rotation
-			notablePeople, // Pass people for rotation
+			cfg.HolidayFeedURL != "", // Must match DetermineContentType
+			funHolidays,              // Pass holidays for rotation
+			notablePeople,            // Pass people for rotation
 			cfg.MaxPeople,
 			cfg.TestDateSeed,
 		)
@@ -316,6 +319,22 @@ func createJob(cfg *config.Config) scheduler.Job {
 			log.Printf("Selected %s", funFact.GetDisplayTitle())
 			if funFact.Text != "" {
 				log.Printf("Content: %s", funFact.Text)
+			}
+		}
+
+		// Optionally replace the static pick with freshly generated content
+		if cfg.AIGeneratedContent && funFact != nil && funfacts.IsAIRefreshable(funFact.Type) {
+			log.Printf("AI content generation enabled - generating fresh %s content...", funFact.Type)
+			generator := llm.NewGenerator(cfg.ClaudeAPIKey, cfg.ClaudeModel)
+			fresh, err := generator.GenerateFreshItem(
+				funfacts.PackDescription(funFact.Type),
+				funfacts.StyleExamples(funFact.Type, cfg.TestDateSeed),
+			)
+			if err != nil {
+				log.Printf("Warning: AI generation failed, keeping static content: %v", err)
+			} else {
+				funFact.Text = fresh
+				log.Printf("Fresh content: %s", fresh)
 			}
 		}
 

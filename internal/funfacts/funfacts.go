@@ -6,11 +6,13 @@ import (
 	"github.com/dpeterka/history-slackbot/internal/blobby"
 	"github.com/dpeterka/history-slackbot/internal/camping"
 	"github.com/dpeterka/history-slackbot/internal/emo"
+	"github.com/dpeterka/history-slackbot/internal/foodtakes"
 	"github.com/dpeterka/history-slackbot/internal/gardening"
 	"github.com/dpeterka/history-slackbot/internal/hottub"
 	"github.com/dpeterka/history-slackbot/internal/jokes"
 	"github.com/dpeterka/history-slackbot/internal/printing3d"
 	"github.com/dpeterka/history-slackbot/internal/quotes"
+	"github.com/dpeterka/history-slackbot/internal/rotation"
 	"github.com/dpeterka/history-slackbot/internal/rss"
 	"github.com/dpeterka/history-slackbot/internal/wikihow"
 	"github.com/dpeterka/history-slackbot/internal/wikihowquizzes"
@@ -20,7 +22,7 @@ import (
 // FunFact represents a fun fact of any type
 type FunFact struct {
 	Text          string
-	Type          string // "emo", "blobby", "wikihow", "wikihow_quizzes", "quote", "holidays", "hottub", "gardening", "printing3d", "camping", "joke", "people", "events"
+	Type          string // "emo", "blobby", "wikihow", "wikihow_quizzes", "quote", "holidays", "hottub", "gardening", "printing3d", "camping", "joke", "foodtakes", "people", "events"
 	Category      string
 	URL           string             // For wikihow articles
 	Author        string             // For quotes
@@ -31,13 +33,13 @@ type FunFact struct {
 
 // GetRandomFunFact returns a random fun fact from all available types
 // For holidays, pass them via GetRandomFunFactWithData
-func GetRandomFunFact(includeEmo, includeBlobby, includeWikiHow, includeWikiHowQuizzes, includeQuote, includeHotTub, includeGardening, includePrinting3D, includeCamping, includeJoke, includePeople, includeEvents bool) *FunFact {
-	return GetRandomFunFactWithData(includeEmo, includeBlobby, includeWikiHow, includeWikiHowQuizzes, includeQuote, includeHotTub, includeGardening, includePrinting3D, includeCamping, includeJoke, includePeople, includeEvents, nil, nil, 0, 0)
+func GetRandomFunFact(includeEmo, includeBlobby, includeWikiHow, includeWikiHowQuizzes, includeQuote, includeHotTub, includeGardening, includePrinting3D, includeCamping, includeJoke, includeFoodTakes, includePeople, includeEvents bool) *FunFact {
+	return GetRandomFunFactWithData(includeEmo, includeBlobby, includeWikiHow, includeWikiHowQuizzes, includeQuote, includeHotTub, includeGardening, includePrinting3D, includeCamping, includeJoke, includeFoodTakes, includePeople, includeEvents, false, nil, nil, 0, 0)
 }
 
 // DetermineContentType returns what content type will be selected for today without fetching data
 // This allows the caller to only fetch data for the selected type
-func DetermineContentType(includeEmo, includeBlobby, includeWikiHow, includeWikiHowQuizzes, includeQuote, includeHotTub, includeGardening, includePrinting3D, includeCamping, includeJoke, includePeople, includeEvents, includeHolidays bool, seed int) string {
+func DetermineContentType(includeEmo, includeBlobby, includeWikiHow, includeWikiHowQuizzes, includeQuote, includeHotTub, includeGardening, includePrinting3D, includeCamping, includeJoke, includeFoodTakes, includePeople, includeEvents, includeHolidays bool, seed int) string {
 	// Use provided seed or current date for seed
 	if seed == 0 {
 		now := time.Now()
@@ -76,6 +78,9 @@ func DetermineContentType(includeEmo, includeBlobby, includeWikiHow, includeWiki
 	if includeJoke {
 		enabledTypes = append(enabledTypes, "joke")
 	}
+	if includeFoodTakes {
+		enabledTypes = append(enabledTypes, "foodtakes")
+	}
 	if includePeople {
 		enabledTypes = append(enabledTypes, "people")
 	}
@@ -91,15 +96,16 @@ func DetermineContentType(includeEmo, includeBlobby, includeWikiHow, includeWiki
 		return ""
 	}
 
-	// Rotate between enabled types based on day
-	dayOfYear := seed % 1000 // Get just the day portion (MMDD)
-	return enabledTypes[dayOfYear%len(enabledTypes)]
+	// Rotate between enabled types based on weekday count (the bot only
+	// posts Mon-Fri; rotating on raw days would starve types whenever the
+	// type count is a multiple of 7)
+	return enabledTypes[rotation.WeekdaysSinceEpoch(seed)%len(enabledTypes)]
 }
 
 // GetRandomFunFactWithData returns a random fun fact with optional holidays and people data, and seed override
 // If seed is 0, uses current date. Otherwise uses the provided seed for testing.
 // Rotates between enabled types based on day
-func GetRandomFunFactWithData(includeEmo, includeBlobby, includeWikiHow, includeWikiHowQuizzes, includeQuote, includeHotTub, includeGardening, includePrinting3D, includeCamping, includeJoke, includePeople, includeEvents bool, holidays []rss.Holiday, people []wikipedia.Person, maxPeople, seed int) *FunFact {
+func GetRandomFunFactWithData(includeEmo, includeBlobby, includeWikiHow, includeWikiHowQuizzes, includeQuote, includeHotTub, includeGardening, includePrinting3D, includeCamping, includeJoke, includeFoodTakes, includePeople, includeEvents, includeHolidays bool, holidays []rss.Holiday, people []wikipedia.Person, maxPeople, seed int) *FunFact {
 	// Use provided seed or current date for seed
 	if seed == 0 {
 		now := time.Now()
@@ -138,13 +144,16 @@ func GetRandomFunFactWithData(includeEmo, includeBlobby, includeWikiHow, include
 	if includeJoke {
 		enabledTypes = append(enabledTypes, "joke")
 	}
-	if includePeople && len(people) > 0 {
+	if includeFoodTakes {
+		enabledTypes = append(enabledTypes, "foodtakes")
+	}
+	if includePeople {
 		enabledTypes = append(enabledTypes, "people")
 	}
 	if includeEvents {
 		enabledTypes = append(enabledTypes, "events")
 	}
-	if len(holidays) > 0 {
+	if includeHolidays {
 		enabledTypes = append(enabledTypes, "holidays")
 	}
 
@@ -153,9 +162,9 @@ func GetRandomFunFactWithData(includeEmo, includeBlobby, includeWikiHow, include
 		return nil
 	}
 
-	// Rotate between enabled types based on day
-	dayOfYear := seed % 1000 // Get just the day portion (MMDD)
-	selectedType := enabledTypes[dayOfYear%len(enabledTypes)]
+	// Rotate between enabled types based on weekday count (must match
+	// DetermineContentType)
+	selectedType := enabledTypes[rotation.WeekdaysSinceEpoch(seed)%len(enabledTypes)]
 
 	switch selectedType {
 	case "emo":
@@ -232,7 +241,17 @@ func GetRandomFunFactWithData(includeEmo, includeBlobby, includeWikiHow, include
 			Text: joke.Text,
 			Type: "joke",
 		}
+	case "foodtakes":
+		take := foodtakes.GetRandomTakeWithSeed(seed)
+		return &FunFact{
+			Text:     take.Text,
+			Type:     "foodtakes",
+			Category: take.Category,
+		}
 	case "people":
+		if len(people) == 0 {
+			return nil
+		}
 		return &FunFact{
 			Type:          "people",
 			NotablePeople: people,
@@ -243,6 +262,9 @@ func GetRandomFunFactWithData(includeEmo, includeBlobby, includeWikiHow, include
 			ShowEvents: true,
 		}
 	case "holidays":
+		if len(holidays) == 0 {
+			return nil
+		}
 		return &FunFact{
 			Type:     "holidays",
 			Holidays: holidays,
@@ -273,6 +295,8 @@ func (f *FunFact) GetDisplayTitle() string {
 		return "🖨️ 3D Printing Tip"
 	case "camping":
 		return "🏕️ Camping Tip of the Day"
+	case "foodtakes":
+		return "🌭 Unhinged Food Take of the Day"
 	case "people":
 		return "🎂 Notable People"
 	case "events":
@@ -287,4 +311,62 @@ func (f *FunFact) GetDisplayTitle() string {
 // ShouldDisplayAsItalic returns whether the fact should be displayed in italic
 func (f *FunFact) ShouldDisplayAsItalic() bool {
 	return f.Type == "emo"
+}
+
+// aiRefreshablePacks maps text-based pack types to a description used when
+// asking the generator for a fresh item in that pack's style.
+var aiRefreshablePacks = map[string]string{
+	"emo":        "a dry, darkly funny observation about work or life (think tired office philosopher)",
+	"blobby":     "an absurd but plausible-sounding 'fact' about Mr Blobby, the chaotic pink British TV character",
+	"joke":       "a groan-worthy dad joke or one-liner",
+	"camping":    "a blunt, irreverent camping tip that is actually useful",
+	"hottub":     "a practical hot tub care tip delivered with personality",
+	"gardening":  "a practical vegetable or hydroponic gardening tip with a bit of wit",
+	"printing3d": "a practical 3D printing tip with hard-earned-wisdom energy",
+	"foodtakes":  "a deliberately controversial but harmless food opinion designed to start friendly arguments",
+}
+
+// IsAIRefreshable reports whether a pack type's content can be freshly
+// generated fresh each day (only plain-text packs; link/data types can't).
+func IsAIRefreshable(packType string) bool {
+	_, ok := aiRefreshablePacks[packType]
+	return ok
+}
+
+// PackDescription returns the generation prompt description for a refreshable pack.
+func PackDescription(packType string) string {
+	return aiRefreshablePacks[packType]
+}
+
+// StyleExamples returns a few items from the pack to calibrate the generator's
+// tone and length. Nearby day seeds are used so examples differ from today's pick.
+func StyleExamples(packType string, seed int) []string {
+	if seed == 0 {
+		now := time.Now()
+		seed = now.Year()*10000 + int(now.Month())*100 + now.Day()
+	}
+
+	examples := []string{}
+	for i := 1; i <= 3; i++ {
+		s := seed + i
+		switch packType {
+		case "emo":
+			examples = append(examples, emo.GetRandomCommentWithSeed(s).Text)
+		case "blobby":
+			examples = append(examples, blobby.GetRandomFactWithSeed(s).Text)
+		case "joke":
+			examples = append(examples, jokes.GetRandomJokeWithSeed(s).Text)
+		case "camping":
+			examples = append(examples, camping.GetRandomTipWithSeed(s).Text)
+		case "hottub":
+			examples = append(examples, hottub.GetRandomTipWithSeed(s).Text)
+		case "gardening":
+			examples = append(examples, gardening.GetRandomTipWithSeed(s).Text)
+		case "printing3d":
+			examples = append(examples, printing3d.GetRandomTipWithSeed(s).Text)
+		case "foodtakes":
+			examples = append(examples, foodtakes.GetRandomTakeWithSeed(s).Text)
+		}
+	}
+	return examples
 }

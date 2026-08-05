@@ -1,7 +1,7 @@
 package wikihowquizzes
 
 import (
-	"math/rand"
+	"github.com/dpeterka/history-slackbot/internal/rotation"
 	"time"
 )
 
@@ -25,9 +25,8 @@ func GetRandomQuizWithSeed(seed int) Quiz {
 		now := time.Now()
 		seed = now.Year()*10000 + int(now.Month())*100 + now.Day()
 	}
-	r := rand.New(rand.NewSource(int64(seed)))
 
-	return quizzes[r.Intn(len(quizzes))]
+	return quizzes[rotation.PickIndex(len(quizzes), seed)]
 }
 
 func getAllQuizzes() []Quiz {
