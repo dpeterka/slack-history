@@ -233,6 +233,10 @@ func (p *Poster) formatCompleteMessage(events []llm.SelectedEvent, majorHoliday 
 	// Handle different fact types
 	if funFact != nil {
 		switch funFact.Type {
+		case "events":
+			// Events are rendered in their own section below; emitting the
+			// funFact here would produce an empty section block, which Slack
+			// rejects with invalid_blocks
 		case "quote":
 			// Format quote with author
 			quoteText := fmt.Sprintf("_%s_\n— %s", funFact.Text, funFact.Author)
@@ -355,6 +359,10 @@ func (p *Poster) formatCompleteMessage(events []llm.SelectedEvent, majorHoliday 
 			}
 		default:
 			// Standard text formatting for emo, blobby, wikihow
+			if funFact.Text == "" {
+				// A section block with empty text is rejected by Slack
+				break
+			}
 			factText := funFact.Text
 			if funFact.ShouldDisplayAsItalic() {
 				factText = fmt.Sprintf("_%s_", factText)
